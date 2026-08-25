@@ -15,9 +15,7 @@ Daybook is a personal daily-life tracker designed to feel like a calm command ce
 
 Everything is saved privately on your own device — no accounts, no ads, no tracking. Installable as an app on any phone or desktop.
 
-## Try it
 
-Live app: **[add your GitHub Pages link here]**
 
 ## Install as an app
 
