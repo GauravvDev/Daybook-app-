@@ -15,7 +15,9 @@ Daybook is a personal daily-life tracker designed to feel like a calm command ce
 
 Everything is saved privately on your own device — no accounts, no ads, no tracking. Installable as an app on any phone or desktop.
 
+## Try it
 
+Live app: **[https://gauravvxcore-debug.github.io/Daybook-app-/](https://gauravvxcore-debug.github.io/Daybook-app-/)**
 
 ## Install as an app
 
@@ -27,8 +29,8 @@ Everything is saved privately on your own device — no accounts, no ads, no tra
 No build step, no dependencies — it's a single static site.
 
 ```bash
-git clone https://github.com/<your-username>/daybook-app.git
-cd daybook-app
+git clone https://github.com/gauravvxcore-debug/Daybook-app-.git
+cd Daybook-app-
 python3 -m http.server 8000
 # open http://localhost:8000
 ```
