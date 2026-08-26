@@ -1,8 +1,8 @@
 # Daybook
 
-Honestly? I built this for myself. I kept trying to track my routine — tasks, habits, water, whatever — and kept bouncing off apps that felt like spreadsheets wearing a productivity costume. So I made something calmer. Something I'd actually open every day instead of abandoning after a week.
+Honestly, I built this for myself. I kept trying to track my routine tasks, habits, water, whatever and kept bouncing off apps that felt like spreadsheets wearing a productivity costume. So I made something calmer. Something I'd actually open every day instead of abandoning after a week.
 
-Turns out it grew into a full daily companion. Track your day, understand yourself a bit better, build some discipline — that's really the whole idea.
+Turns out it grew into a full daily companion. Track your day, understand yourself a bit better, build some discipline, that's really the whole idea.
 
 ## Try it
 
@@ -10,23 +10,23 @@ Turns out it grew into a full daily companion. Track your day, understand yourse
 
 ## What's actually in here
 
-**Tasks & Habits.** The basics, done well — priorities, categories, and streaks that make you not want to break the chain.
+**Tasks & Habits :** The basics, done well priorities, categories, and streaks that make you not want to break the chain.
 
-**Goals.** For the bigger stuff. A project at work, an exam you're prepping for — break it into topics, check them off, watch the progress bar move instead of just hoping you're on track.
+**Goals  :** For the bigger stuff. A project at work, an exam you're prepping for — break it into topics, check them off, watch the progress bar move instead of just hoping you're on track.
 
-**Focus.** A Pomodoro timer, but you can also book actual time slots ahead of time — "Study 4-6pm" — so your day has some shape to it.
+**Focus :** A Pomodoro timer, but you can also book actual time slots ahead of time — "Study 4-6pm" — so your day has some shape to it.
 
-**Journal.** This one's just for you. Write whatever, attach a photo or a voice note if text doesn't cut it that day. Lock it with a PIN or your face/fingerprint if it's on a shared device.
+**Journal :** This one's just for you. Write whatever, attach a photo or a voice note if text doesn't cut it that day. Lock it with a PIN or your face/fingerprint if it's on a shared device.
 
-**Health.** Water, sleep, mood, workouts, meds — the stuff that's easy to forget to log but matters most.
+**Health :** Water, sleep, mood, workouts, meds — the stuff that's easy to forget to log but matters most.
 
-**Insights.** A weekly report that actually tells you something, not just a wall of numbers.
+**Insights :** A weekly report that actually tells you something, not just a wall of numbers.
 
-**Make it yours.** Rearrange the dashboard, pick your accent color, switch to dark mode at 11pm like the rest of us.
+**Make it yours :**  Rearrange the dashboard, pick your accent color, switch to dark mode at 11pm like the rest of us.
 
 ## The part I actually care about
 
-There's no sign-up. No ads. Nothing gets sent anywhere — it all just lives on your device, and it installs like a real app on your phone. I wanted something private, not another service quietly collecting my mood logs.
+There's no sign-up. No ads. Nothing gets sent anywhere it all just lives on your device, and it installs like a real app on your phone. I wanted something private, not another service quietly collecting my mood logs.
 
 ## Run it yourself
 
