@@ -339,6 +339,7 @@ const NAV_ITEMS = [
   {id:"home", label:"Home", icon:"home"},
   {id:"tasks", label:"Tasks", icon:"check-square"},
   {id:"habits", label:"Habits", icon:"repeat"},
+  {id:"goals", label:"Goals", icon:"target"},
   {id:"focus", label:"Focus", icon:"timer"},
   {id:"journal", label:"Journal", icon:"notebook-pen"},
   {id:"health", label:"Health", icon:"heart-pulse"},
@@ -347,7 +348,18 @@ const NAV_ITEMS = [
   {id:"settings", label:"Settings", icon:"settings"},
 ];
 const BOTTOM_NAV = ["home","tasks","focus","journal","more"];
-const MORE_SHEET_ITEMS = ["habits","health","calendar","insights","settings"];
+const MORE_SHEET_ITEMS = ["habits","goals","health","calendar","insights","settings"];
+const GOAL_TYPES = [
+  {id:"project", label:"Project", icon:"briefcase"},
+  {id:"study", label:"Study / Exam", icon:"graduation-cap"},
+  {id:"personal", label:"Personal", icon:"star"},
+  {id:"custom", label:"Custom", icon:"target"},
+];
+const GOAL_STATUSES = [
+  {id:"active", label:"On Track", color:"var(--accent)"},
+  {id:"delayed", label:"Delayed", color:"var(--danger)"},
+  {id:"done", label:"Done", color:"var(--gold)"},
+];
 
 /* ---------------- date helpers ---------------- */
 function todayKey(d){ d = d || new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); }
@@ -366,7 +378,8 @@ function defaultState(){
     version:1,
     user:{ name:"Alex", avatarEmoji:"🌿", darkMode:false, accent:ACCENTS[0] },
     settings:{ waterGoalMl:2500, sleepGoalHrs:8, pomodoroFocusMin:25, pomodoroBreakMin:5,
-      notifTasks:true, notifWater:true, notifHabits:true, notifSound:true, soundChoice:"chime", quotePref:"mixed" },
+      notifTasks:true, notifWater:true, notifHabits:true, notifMeds:true, notifSound:true, soundChoice:"chime", quotePref:"mixed",
+      journalLockEnabled:false, journalPinHash:null, journalUnlockMethod:"pin", journalWebAuthnCredId:null },
     categories:["Personal","Work","Study","Errands"],
     tasks:[
       {id:uid(), title:"Plan tomorrow's priorities", description:"", date:today, time:"20:30", priority:"low", category:"Personal", completed:false},
@@ -398,8 +411,23 @@ function defaultState(){
       {id:uid(), date:today, type:"study", label:"Math revision", startTime:"16:00", duration:50, completed:false},
     ],
     journal:{ entries:{ [y]:{ text:"Felt productive today — finished the report ahead of schedule and had a good walk in the evening.", updatedAt: Date.now()-86400000 } } },
+    goals:[
+      {id:uid(), title:"Website Redesign Project", type:"project", deadline: addDays(today,21), status:"active", progress:0, topics:[
+        {id:uid(), title:"Wireframes", done:true},
+        {id:uid(), title:"Client review", done:true},
+        {id:uid(), title:"Final build", done:false},
+        {id:uid(), title:"Launch", done:false},
+      ], createdAt:today},
+      {id:uid(), title:"Prepare for Physics Exam", type:"study", deadline: addDays(today,14), status:"active", progress:0, topics:[
+        {id:uid(), title:"Chapter 1 — Mechanics", done:true},
+        {id:uid(), title:"Chapter 2 — Thermodynamics", done:false},
+        {id:uid(), title:"Chapter 3 — Optics", done:false},
+        {id:uid(), title:"Practice papers", done:false},
+      ], createdAt:today},
+    ],
     favoriteQuotes:[],
     quoteIndexByDate:{},
+    onboarded:false,
     lastRoute:"home",
   };
 }
@@ -412,6 +440,9 @@ function load(){
     const parsed = JSON.parse(raw);
     // shallow-merge with defaults for forward-compat
     const def = defaultState();
+    // returning users (any existing saved state) shouldn't see the onboarding wizard
+    // just because it's a newly added field — only truly fresh installs get it.
+    if(parsed.onboarded === undefined) parsed.onboarded = true;
     return Object.assign({}, def, parsed, {
       user:Object.assign({},def.user, parsed.user||{}),
       settings:Object.assign({},def.settings, parsed.settings||{}),
@@ -427,7 +458,7 @@ function save(){
 }
 
 /* ---------------- app runtime state ---------------- */
-const ui = { route: state.lastRoute || "home", calMonth: new Date(), calSelected: todayKey(), moreOpen:false, pomodoro:{running:false, mode:"focus", remaining: (state.settings.pomodoroFocusMin*60), interval:null, activeSessionId:null} };
+const ui = { route: state.lastRoute || "home", calMonth: new Date(), calSelected: todayKey(), moreOpen:false, journalUnlocked:false, pomodoro:{running:false, mode:"focus", remaining: (state.settings.pomodoroFocusMin*60), interval:null, activeSessionId:null} };
 
 function setRoute(r){
   ui.route = r; ui.moreOpen=false; state.lastRoute = r; save();
@@ -621,6 +652,20 @@ function renderHome(){
       <div class="card grid grid-3" style="gap:10px;">
         ${state.habits.slice(0,6).map(h=>habitChipHtml(h,today)).join("") || emptyState("repeat","No habits yet","Add a habit to start tracking.")}
       </div>`,
+    goals: ()=>`
+      <div class="section-title"><h2>Goals</h2><a href="#" data-route="goals" class="muted" style="font-size:12.5px; font-weight:600;">View all →</a></div>
+      <div class="card">
+        ${state.goals.filter(g=>g.status!=="done").slice(0,3).map(g=>{
+          const pct = goalProgress(g); const statusMeta = goalStatusMeta(g.status);
+          return `<div style="margin-bottom:12px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px;">
+              <span style="font-weight:600; font-size:13px;">${escapeHtml(g.title)}</span>
+              <span class="mono muted" style="font-size:11px;">${pct}%</span>
+            </div>
+            <div class="bar"><span style="width:${pct}%; background:${statusMeta.color};"></span></div>
+          </div>`;
+        }).join("") || emptyState("target","No active goals","Add a project or study goal to track.")}
+      </div>`,
     water: ()=>`
       <div class="card" style="margin-bottom:16px;">
         <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
@@ -727,6 +772,7 @@ const DASHBOARD_SECTIONS = [
   {id:"quote", label:"Daily Quote", icon:"quote", zone:"top"},
   {id:"tasks", label:"Today's Tasks", icon:"check-square", zone:"left"},
   {id:"habits", label:"Habits", icon:"repeat", zone:"left"},
+  {id:"goals", label:"Goals", icon:"target", zone:"left"},
   {id:"water", label:"Water Tracker", icon:"droplets", zone:"right"},
   {id:"mood", label:"Mood Check-in", icon:"smile", zone:"right"},
   {id:"focus", label:"Focus Timer", icon:"timer", zone:"right"},
@@ -1014,6 +1060,7 @@ function openTaskModal(taskId){
     if(editing){ Object.assign(editing, data); toast("Task updated","check"); }
     else{ state.tasks.push(Object.assign({id:uid(), completed:false}, data)); toast("Task added","plus"); }
     save(); closeModal(); rerenderCurrent();
+    if(data.reminder) ensureNotifPermission();
   };
   if(editing){
     document.getElementById("tf-delete").onclick = ()=>{
@@ -1101,6 +1148,158 @@ function openHabitModal(habitId){
     document.getElementById("hf-delete").onclick = ()=>{
       confirmAction("Delete habit?","This removes its full tracking history.", ()=>{
         state.habits = state.habits.filter(h=>h.id!==editing.id); save(); closeModal(); rerenderCurrent();
+      });
+    };
+  }
+}
+
+/* =========================================================
+   VIEW: GOALS  (projects / study goals with topics + progress)
+   ========================================================= */
+function goalProgress(g){
+  if(g.topics && g.topics.length>0){
+    return Math.round(g.topics.filter(t=>t.done).length / g.topics.length * 100);
+  }
+  return clamp(g.progress||0, 0, 100);
+}
+function goalTypeMeta(id){ return GOAL_TYPES.find(t=>t.id===id) || GOAL_TYPES[GOAL_TYPES.length-1]; }
+function goalStatusMeta(id){ return GOAL_STATUSES.find(s=>s.id===id) || GOAL_STATUSES[0]; }
+function renderGoals(){
+  const root = document.getElementById("view-root");
+  const goals = state.goals.slice().sort((a,b)=>{
+    if(a.status==="done" && b.status!=="done") return 1;
+    if(b.status==="done" && a.status!=="done") return -1;
+    return (a.deadline||"9999").localeCompare(b.deadline||"9999");
+  });
+  root.innerHTML = `
+    <div class="hero"><div><h1>Goals</h1><div class="sub">Projects and study goals, tracked over time.</div></div>
+      <button class="btn btn-primary" id="add-goal-btn">${icon("plus",16)} New Goal</button>
+    </div>
+    <div class="grid" style="margin-top:18px; gap:16px;">
+      ${goals.length ? goals.map(goalCardHtml).join("") : `<div class="card">${emptyState("target","No goals yet","Add a project or study goal to start tracking progress.")}</div>`}
+    </div>
+  `;
+  document.getElementById("add-goal-btn").onclick = ()=>openGoalModal();
+  bindGoalCardEvents(root);
+  mountIcons();
+}
+function goalCardHtml(g){
+  const meta = goalTypeMeta(g.type);
+  const statusMeta = goalStatusMeta(g.status);
+  const pct = goalProgress(g);
+  const daysLeft = g.deadline ? Math.round((new Date(g.deadline+"T00:00") - new Date(todayKey()+"T00:00"))/86400000) : null;
+  return `<div class="card" data-goal="${g.id}">
+    <div style="display:flex; align-items:flex-start; justify-content:space-between; gap:12px; margin-bottom:10px;">
+      <div style="min-width:0;">
+        <div style="display:flex; align-items:center; gap:8px; margin-bottom:3px;">
+          <span class="tag">${icon(meta.icon,11)} ${meta.label}</span>
+          <span class="tag" style="background:color-mix(in srgb, ${statusMeta.color} 18%, transparent); color:${statusMeta.color};">${statusMeta.label}</span>
+        </div>
+        <div style="font-family:'Fraunces',serif; font-weight:600; font-size:17px;">${escapeHtml(g.title)}</div>
+        ${g.deadline?`<div class="muted" style="font-size:12px; margin-top:2px;">${icon("calendar",11)} ${fmtDateLong(g.deadline)} ${daysLeft!==null?(daysLeft>=0?`· ${daysLeft}d left`:`· ${Math.abs(daysLeft)}d overdue`):''}</div>`:''}
+      </div>
+      <div style="display:flex; gap:4px; flex-shrink:0;">
+        <button class="icon-btn-plain" data-edit-goal="${g.id}">${icon("pencil",15)}</button>
+        <button class="icon-btn-plain" data-del-goal="${g.id}">${icon("trash-2",15)}</button>
+      </div>
+    </div>
+    <div class="bar" style="margin-bottom:6px;"><span style="width:${pct}%; background:${statusMeta.color};"></span></div>
+    <div class="muted mono" style="font-size:11.5px; margin-bottom:12px;">${pct}% complete</div>
+    ${g.topics && g.topics.length ? `
+      <div>
+        ${g.topics.map(t=>`
+          <div class="item-row" style="padding:8px 2px;">
+            <div class="checkbox ${t.done?'done':''}" style="width:20px;height:20px;" data-toggle-topic="${g.id}|${t.id}">${t.done?icon('check',12):''}</div>
+            <div class="item-title ${t.done?'done':''}" style="font-size:13px; flex:1;">${escapeHtml(t.title)}</div>
+            <button class="icon-btn-plain" style="padding:3px;" data-del-topic="${g.id}|${t.id}">${icon("x",13)}</button>
+          </div>
+        `).join("")}
+      </div>
+      <div class="row" style="margin-top:8px;">
+        <input type="text" placeholder="Add a topic / milestone..." data-newtopic="${g.id}" />
+        <button class="btn-icon" data-addtopic-btn="${g.id}">${icon("plus",16)}</button>
+      </div>
+    ` : `
+      <div class="row" style="margin-top:4px;">
+        <input type="text" placeholder="Add a topic / milestone (optional)..." data-newtopic="${g.id}" />
+        <button class="btn-icon" data-addtopic-btn="${g.id}">${icon("plus",16)}</button>
+      </div>
+    `}
+  </div>`;
+}
+function bindGoalCardEvents(root){
+  root.querySelectorAll("[data-edit-goal]").forEach(b=> b.onclick = ()=> openGoalModal(b.dataset.editGoal));
+  root.querySelectorAll("[data-del-goal]").forEach(b=> b.onclick = ()=>{
+    confirmAction("Delete goal?","This removes it and all its topics.", ()=>{
+      state.goals = state.goals.filter(g=>g.id!==b.dataset.delGoal); save(); rerenderCurrent();
+    });
+  });
+  root.querySelectorAll("[data-toggle-topic]").forEach(b=> b.onclick = ()=>{
+    const [gid,tid] = b.dataset.toggleTopic.split("|");
+    const g = state.goals.find(x=>x.id===gid); const t = g.topics.find(x=>x.id===tid);
+    t.done = !t.done; save(); rerenderCurrent();
+  });
+  root.querySelectorAll("[data-del-topic]").forEach(b=> b.onclick = ()=>{
+    const [gid,tid] = b.dataset.delTopic.split("|");
+    const g = state.goals.find(x=>x.id===gid);
+    g.topics = g.topics.filter(x=>x.id!==tid); save(); rerenderCurrent();
+  });
+  root.querySelectorAll("[data-addtopic-btn]").forEach(b=> {
+    const gid = b.dataset.addtopicBtn;
+    const doAdd = ()=>{
+      const input = root.querySelector(`[data-newtopic="${gid}"]`);
+      const v = input.value.trim(); if(!v) return;
+      const g = state.goals.find(x=>x.id===gid);
+      g.topics = g.topics||[];
+      g.topics.push({id:uid(), title:v, done:false});
+      save(); rerenderCurrent();
+    };
+    b.onclick = doAdd;
+    const input = root.querySelector(`[data-newtopic="${gid}"]`);
+    if(input) input.onkeydown = e=>{ if(e.key==="Enter") doAdd(); };
+  });
+}
+function openGoalModal(goalId){
+  const editing = goalId ? state.goals.find(g=>g.id===goalId) : null;
+  openModal(`
+    <div class="modal-head"><h3>${editing?"Edit Goal":"New Goal"}</h3><button class="icon-btn-plain" onclick="__closeModal()">${icon("x",20)}</button></div>
+    <div class="field"><label class="field-label">Title</label><input type="text" id="gf-title" value="${editing?escapeHtml(editing.title):''}" placeholder="e.g. Launch office project, Prepare for exam"/></div>
+    <div class="field"><label class="field-label">Type</label>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        ${GOAL_TYPES.map(t=>`<button class="btn-icon" data-gtype="${t.id}" style="width:auto;padding:0 12px;gap:6px;display:inline-flex;align-items:center;${(editing?editing.type:GOAL_TYPES[0].id)===t.id?'background:var(--accent-soft);color:var(--accent);border-color:var(--accent);':''}">${icon(t.icon,15)} ${t.label}</button>`).join("")}
+      </div>
+    </div>
+    <div class="row field">
+      <div><label class="field-label">Deadline (optional)</label><input type="date" id="gf-deadline" value="${editing&&editing.deadline?editing.deadline:''}"/></div>
+      <div><label class="field-label">Status</label>
+        <select id="gf-status">
+          ${GOAL_STATUSES.map(s=>`<option value="${s.id}" ${editing&&editing.status===s.id?'selected':''}>${s.label}</option>`).join("")}
+        </select>
+      </div>
+    </div>
+    <div class="row" style="margin-top:6px;">
+      ${editing?`<button class="btn btn-danger" id="gf-delete">Delete</button>`:""}
+      <button class="btn btn-primary" id="gf-save" style="flex:2;">${editing?"Save":"Create Goal"}</button>
+    </div>
+  `);
+  let selectedType = editing? editing.type : GOAL_TYPES[0].id;
+  document.querySelectorAll("[data-gtype]").forEach(b=> b.onclick = ()=>{
+    selectedType = b.dataset.gtype;
+    document.querySelectorAll("[data-gtype]").forEach(x=>x.style.cssText="width:auto;padding:0 12px;gap:6px;display:inline-flex;align-items:center;");
+    b.style.cssText = "width:auto;padding:0 12px;gap:6px;display:inline-flex;align-items:center;background:var(--accent-soft);color:var(--accent);border-color:var(--accent);";
+  });
+  document.getElementById("gf-save").onclick = ()=>{
+    const title = document.getElementById("gf-title").value.trim();
+    if(!title){ toast("Give the goal a title"); return; }
+    const data = { title, type:selectedType, deadline: document.getElementById("gf-deadline").value, status: document.getElementById("gf-status").value };
+    if(editing){ Object.assign(editing, data); toast("Goal updated","check"); }
+    else{ state.goals.push(Object.assign({id:uid(), progress:0, topics:[], createdAt:todayKey()}, data)); toast("Goal created","target"); }
+    save(); closeModal(); rerenderCurrent();
+  };
+  if(editing){
+    document.getElementById("gf-delete").onclick = ()=>{
+      confirmAction("Delete goal?","This removes it and all its topics.", ()=>{
+        state.goals = state.goals.filter(g=>g.id!==editing.id); save(); closeModal(); rerenderCurrent();
       });
     };
   }
@@ -1252,17 +1451,196 @@ function openFocusSessionModal(){
 }
 
 /* =========================================================
+   DEVICE STORAGE  (IndexedDB for photos/voice notes — localStorage
+   only holds ~5-10MB, media needs real device-scale storage)
+   ========================================================= */
+const MEDIA_DB_NAME = "daybook_media";
+const MEDIA_STORE = "blobs";
+let mediaDbPromise = null;
+function openMediaDb(){
+  if(mediaDbPromise) return mediaDbPromise;
+  mediaDbPromise = new Promise((resolve,reject)=>{
+    if(!window.indexedDB){ reject(new Error("IndexedDB not supported")); return; }
+    const req = indexedDB.open(MEDIA_DB_NAME, 1);
+    req.onupgradeneeded = ()=>{ req.result.createObjectStore(MEDIA_STORE); };
+    req.onsuccess = ()=> resolve(req.result);
+    req.onerror = ()=> reject(req.error);
+  });
+  return mediaDbPromise;
+}
+async function mediaPut(id, blob){
+  const db = await openMediaDb();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(MEDIA_STORE, "readwrite");
+    tx.objectStore(MEDIA_STORE).put(blob, id);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+async function mediaGet(id){
+  const db = await openMediaDb();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(MEDIA_STORE, "readonly");
+    const req = tx.objectStore(MEDIA_STORE).get(id);
+    req.onsuccess = ()=>resolve(req.result || null);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+async function mediaDelete(id){
+  const db = await openMediaDb();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(MEDIA_STORE, "readwrite");
+    tx.objectStore(MEDIA_STORE).delete(id);
+    tx.oncomplete = ()=>resolve();
+    tx.onerror = ()=>reject(tx.error);
+  });
+}
+const mediaUrlCache = new Map(); // mediaId -> blob object URL, populated lazily
+function mediaUrl(id){ return mediaUrlCache.get(id) || ""; }
+async function ensureMediaUrls(ids){
+  let changed = false;
+  for(const id of ids){
+    if(!id || mediaUrlCache.has(id)) continue;
+    try{
+      const blob = await mediaGet(id);
+      if(blob){ mediaUrlCache.set(id, URL.createObjectURL(blob)); changed = true; }
+    }catch(e){ /* skip individual failures, rest still render */ }
+  }
+  return changed;
+}
+// One-time migration: earlier versions stored photos/voice notes as giant
+// base64 strings directly in localStorage. Move any of those into IndexedDB
+// so old data keeps working under the new, much larger storage limit.
+async function migrateBase64MediaToIndexedDB(){
+  let didMigrate = false;
+  for(const dateKey of Object.keys(state.journal.entries)){
+    const entry = state.journal.entries[dateKey];
+    for(const field of ['images','voiceNotes']){
+      const arr = entry[field];
+      if(!arr) continue;
+      for(let i=0;i<arr.length;i++){
+        const v = arr[i];
+        if(typeof v === 'string' && v.startsWith('data:')){
+          try{
+            const blob = await (await fetch(v)).blob();
+            const id = (field==='images'?'img-':'voice-')+uid();
+            await mediaPut(id, blob);
+            mediaUrlCache.set(id, URL.createObjectURL(blob));
+            arr[i] = id;
+            didMigrate = true;
+          }catch(e){ /* leave that one as-is if conversion fails */ }
+        }
+      }
+    }
+  }
+  if(didMigrate){ save(); if(ui.route==='journal') renderJournal(); }
+}
+
+/* =========================================================
+   DEVICE SCREEN LOCK  (WebAuthn — triggers the phone's real
+   Face ID / fingerprint / device PIN prompt, not a copy of it)
+   ========================================================= */
+let DEVICE_UNLOCK_SUPPORTED = false;
+function bufToBase64(buf){
+  const bytes = new Uint8Array(buf);
+  let bin = "";
+  for(let i=0;i<bytes.length;i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin);
+}
+function base64ToBuf(b64){
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for(let i=0;i<bin.length;i++) bytes[i] = bin.charCodeAt(i);
+  return bytes.buffer;
+}
+async function checkDeviceUnlockSupport(){
+  try{
+    DEVICE_UNLOCK_SUPPORTED = !!(window.PublicKeyCredential && await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable());
+  }catch(e){ DEVICE_UNLOCK_SUPPORTED = false; }
+  if(DEVICE_UNLOCK_SUPPORTED && ui.route==="settings") renderSettings();
+}
+async function setupDeviceUnlock(){
+  try{
+    const cred = await navigator.credentials.create({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        rp: { name: "Daybook" },
+        user: { id: crypto.getRandomValues(new Uint8Array(16)), name: "daybook-journal", displayName: "Daybook Journal" },
+        pubKeyCredParams: [{type:"public-key", alg:-7},{type:"public-key", alg:-257}],
+        authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
+        timeout: 60000,
+        attestation: "none"
+      }
+    });
+    state.settings.journalWebAuthnCredId = bufToBase64(cred.rawId);
+    state.settings.journalUnlockMethod = "device";
+    state.settings.journalLockEnabled = true;
+    ui.journalUnlocked = true;
+    save();
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+async function verifyDeviceUnlock(){
+  try{
+    await navigator.credentials.get({
+      publicKey: {
+        challenge: crypto.getRandomValues(new Uint8Array(32)),
+        allowCredentials: [{ id: base64ToBuf(state.settings.journalWebAuthnCredId), type: "public-key" }],
+        userVerification: "required",
+        timeout: 60000,
+      }
+    });
+    return true;
+  }catch(e){
+    return false;
+  }
+}
+
+/* =========================================================
    VIEW: JOURNAL  (free-form daily writing, separate from Reflection)
    ========================================================= */
+async function sha256Hex(str){
+  // Prefer real SHA-256 when available, but this only works in secure contexts
+  // (https/localhost) — fall back to a simple sync hash everywhere else so the
+  // lock still works inside previews, sandboxed frames, or file:// pages.
+  try{
+    if(window.crypto && window.crypto.subtle && window.isSecureContext){
+      const buf = new TextEncoder().encode(str);
+      const hashBuf = await crypto.subtle.digest('SHA-256', buf);
+      return Array.from(new Uint8Array(hashBuf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+    }
+  }catch(e){ /* fall through to simple hash below */ }
+  return simplePinHash(str);
+}
+function simplePinHash(str){
+  let h1 = 0xdeadbeef, h2 = 0x41c6ce57;
+  for(let i=0;i<str.length;i++){
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1>>>16), 2246822507) ^ Math.imul(h2 ^ (h2>>>13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2>>>16), 2246822507) ^ Math.imul(h1 ^ (h1>>>13), 3266489909);
+  return (h1>>>0).toString(16) + (h2>>>0).toString(16);
+}
 function renderJournal(){
   const root = document.getElementById("view-root");
+  const hasCredential = state.settings.journalPinHash || state.settings.journalWebAuthnCredId;
+  if(state.settings.journalLockEnabled && hasCredential && !ui.journalUnlocked){
+    renderJournalLockScreen();
+    return;
+  }
   const today = todayKey();
   const pastDates = Object.keys(state.journal.entries)
-    .filter(d=> d!==today && (state.journal.entries[d].text||"").trim().length>0)
+    .filter(d=> d!==today && ((state.journal.entries[d].text||"").trim().length>0 || (state.journal.entries[d].images||[]).length>0 || (state.journal.entries[d].voiceNotes||[]).length>0))
     .sort().reverse();
 
   root.innerHTML = `
-    <div class="hero"><div><h1>Journal</h1><div class="sub">A free space to write about your day.</div></div></div>
+    <div class="hero"><div><h1>Journal</h1><div class="sub">A free space to write about your day.</div></div>
+      ${state.settings.journalLockEnabled?`<button class="btn-icon" id="journal-relock-btn" title="Lock now">${icon("lock",16)}</button>`:""}
+    </div>
     <div class="cols-2" style="margin-top:18px;">
       <div>${journalTodayCardHtml(today)}</div>
       <div>
@@ -1275,17 +1653,150 @@ function renderJournal(){
   `;
   bindJournalTodayEvents(root, today);
   root.querySelectorAll("[data-open-journal]").forEach(el=> el.onclick = ()=> openJournalEntryModal(el.dataset.openJournal));
+  const relockBtn = document.getElementById("journal-relock-btn");
+  if(relockBtn) relockBtn.onclick = ()=>{ ui.journalUnlocked=false; renderJournal(); };
+  mountIcons();
+  const todayEntry = state.journal.entries[today] || {};
+  const neededIds = [...(todayEntry.images||[]), ...(todayEntry.voiceNotes||[])];
+  if(neededIds.length){
+    ensureMediaUrls(neededIds).then(changed=>{ if(changed && ui.route==="journal") renderJournal(); });
+  }
+}
+function openJournalPinModal(enableAfter){
+  openModal(`
+    <div class="modal-head"><h3>${state.settings.journalPinHash?"Change PIN":"Set a PIN"}</h3><button class="icon-btn-plain" onclick="__closeModal()">${icon("x",20)}</button></div>
+    <div class="field"><label class="field-label">New PIN (4–6 digits)</label><input type="password" inputmode="numeric" maxlength="6" id="jp-new" style="text-align:center; font-size:20px; letter-spacing:6px;" placeholder="••••"/></div>
+    <div class="field"><label class="field-label">Confirm PIN</label><input type="password" inputmode="numeric" maxlength="6" id="jp-confirm" style="text-align:center; font-size:20px; letter-spacing:6px;" placeholder="••••"/></div>
+    <div id="jp-error" style="font-size:12px; color:var(--danger); min-height:16px; margin-bottom:6px;"></div>
+    <button class="btn btn-primary" id="jp-save" style="width:100%;">Save PIN</button>
+  `);
+  document.getElementById("jp-save").onclick = async ()=>{
+    const a = document.getElementById("jp-new").value.trim();
+    const b = document.getElementById("jp-confirm").value.trim();
+    const errEl = document.getElementById("jp-error");
+    if(!/^\d{4,6}$/.test(a)){ errEl.textContent = "PIN must be 4–6 digits."; return; }
+    if(a!==b){ errEl.textContent = "PINs don't match."; return; }
+    try{
+      state.settings.journalPinHash = await sha256Hex(a);
+      if(enableAfter) state.settings.journalLockEnabled = true;
+      ui.journalUnlocked = true;
+      save(); closeModal(); toast("PIN saved","lock"); rerenderCurrent();
+    }catch(e){
+      errEl.textContent = "Couldn't save the PIN — please try again.";
+    }
+  };
+}
+function renderJournalLockScreen(){
+  const root = document.getElementById("view-root");
+  const method = state.settings.journalUnlockMethod || "pin";
+  const useDevice = method === "device" && state.settings.journalWebAuthnCredId;
+  const canSwitchToPin = state.settings.journalPinHash;
+
+  root.innerHTML = `
+    <div class="hero"><div><h1>Journal</h1><div class="sub">Locked for privacy.</div></div></div>
+    <div class="card" style="max-width:320px; margin:40px auto; text-align:center;">
+      ${icon(useDevice?"fingerprint":"lock",30)}
+      ${useDevice ? `
+        <div style="font-weight:700; margin:14px 0 4px;">Use your device to unlock</div>
+        <div class="muted" style="font-size:12.5px; margin-bottom:16px;">Face ID, fingerprint, or your device's screen lock</div>
+        <button class="btn btn-primary" id="journal-device-unlock-btn" style="width:100%;">${icon("fingerprint",15)} Unlock</button>
+        <div id="journal-pin-error" style="font-size:12px; margin-top:8px; color:var(--danger); min-height:16px;"></div>
+        ${canSwitchToPin ? `<a href="#" id="journal-use-pin-instead" style="font-size:12px; color:var(--ink-soft); text-decoration:underline; display:block; margin-bottom:6px;">Use PIN instead</a>` : ""}
+      ` : `
+        <div style="font-weight:700; margin:14px 0 4px;">Enter your PIN</div>
+        <div class="muted" style="font-size:12.5px; margin-bottom:16px;">to view your journal</div>
+        <input type="password" inputmode="numeric" maxlength="6" id="journal-pin-input" style="text-align:center; font-size:22px; letter-spacing:8px;" placeholder="••••"/>
+        <button class="btn btn-primary" id="journal-pin-submit" style="width:100%; margin-top:12px;">Unlock</button>
+        <div id="journal-pin-error" style="font-size:12px; margin-top:8px; color:var(--danger); min-height:16px;"></div>
+        ${state.settings.journalWebAuthnCredId ? `<a href="#" id="journal-use-device-instead" style="font-size:12px; color:var(--ink-soft); text-decoration:underline; display:block; margin-bottom:6px;">Use device unlock instead</a>` : ""}
+      `}
+      <a href="#" id="journal-pin-forgot" style="font-size:12px; color:var(--ink-soft); text-decoration:underline;">Forgot? Reset lock</a>
+    </div>
+  `;
+
+  if(useDevice){
+    document.getElementById("journal-device-unlock-btn").onclick = async ()=>{
+      const ok = await verifyDeviceUnlock();
+      if(ok){ ui.journalUnlocked = true; renderJournal(); }
+      else{ document.getElementById("journal-pin-error").textContent = "Unlock cancelled or failed — try again."; }
+    };
+    const switchBtn = document.getElementById("journal-use-pin-instead");
+    if(switchBtn) switchBtn.onclick = (e)=>{ e.preventDefault(); state.settings.journalUnlockMethod="pin"; save(); renderJournalLockScreen(); };
+  } else {
+    const input = document.getElementById("journal-pin-input");
+    const submit = async ()=>{
+      const val = input.value.trim();
+      if(!val) return;
+      try{
+        const hash = await sha256Hex(val);
+        if(hash === state.settings.journalPinHash){
+          ui.journalUnlocked = true; renderJournal();
+        } else {
+          document.getElementById("journal-pin-error").textContent = "Incorrect PIN, try again.";
+          input.value=""; input.focus();
+        }
+      }catch(e){
+        document.getElementById("journal-pin-error").textContent = "Something went wrong checking the PIN — try the reset link below.";
+      }
+    };
+    document.getElementById("journal-pin-submit").onclick = submit;
+    input.onkeydown = e=>{ if(e.key==="Enter") submit(); };
+    const switchBtn = document.getElementById("journal-use-device-instead");
+    if(switchBtn) switchBtn.onclick = (e)=>{ e.preventDefault(); state.settings.journalUnlockMethod="device"; save(); renderJournalLockScreen(); };
+    input.focus();
+  }
+
+  const resetLink = document.getElementById("journal-pin-forgot");
+  if(resetLink) resetLink.onclick = (e)=>{
+    e.preventDefault();
+    confirmAction("Reset journal lock?","This turns the lock off so you can get back in. You can set it up again afterward from Settings.", ()=>{
+      state.settings.journalLockEnabled = false;
+      state.settings.journalPinHash = null;
+      state.settings.journalWebAuthnCredId = null;
+      ui.journalUnlocked = true;
+      save(); renderJournal();
+    });
+  };
   mountIcons();
 }
 function journalTodayCardHtml(dateKey){
   const entry = state.journal.entries[dateKey] || {};
+  const images = entry.images || [];
+  const voiceNotes = entry.voiceNotes || [];
   const wc = (entry.text||"").trim().split(/\s+/).filter(Boolean).length;
   return `<div class="card" id="journal-today-card" data-date="${dateKey}">
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
       <div style="font-family:'Fraunces',serif; font-weight:600; font-size:16px;">${fmtDateLong(dateKey)}</div>
       <span class="muted mono" id="journal-wordcount" style="font-size:11.5px;">${wc} word${wc===1?'':'s'}</span>
     </div>
-    <textarea id="journal-textarea" placeholder="Write freely about your day — what happened, how you felt, anything on your mind..." style="min-height:280px; line-height:1.6;">${escapeHtml(entry.text||"")}</textarea>
+    <textarea id="journal-textarea" placeholder="Write freely about your day — what happened, how you felt, anything on your mind..." style="min-height:220px; line-height:1.6;">${escapeHtml(entry.text||"")}</textarea>
+
+    <div style="display:flex; gap:8px; margin-top:12px; flex-wrap:wrap;">
+      <button class="btn btn-ghost" id="journal-addphoto-btn">${icon("image-plus",15)} Add Photo</button>
+      <input type="file" id="journal-photo-input" accept="image/*" style="display:none;"/>
+      <button class="btn btn-ghost" id="journal-voice-btn">${icon("mic",15)} Record Voice Note</button>
+    </div>
+
+    ${images.length ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">
+      ${images.map((id,i)=>{
+        const url = mediaUrl(id);
+        return `<div style="position:relative;">
+          ${url ? `<img src="${url}" style="width:66px;height:66px;object-fit:cover;border-radius:12px; cursor:pointer;" data-view-image="${i}"/>` : `<div class="skeleton" style="width:66px;height:66px;border-radius:12px;"></div>`}
+          <button class="icon-btn-plain" style="position:absolute; top:-6px; right:-6px; background:var(--card); border:1px solid var(--border); border-radius:50%; width:20px; height:20px; padding:0; display:flex; align-items:center; justify-content:center;" data-del-image="${i}">${icon('x',11)}</button>
+        </div>`;
+      }).join("")}
+    </div>` : ""}
+
+    ${voiceNotes.length ? `<div style="margin-top:12px;">
+      ${voiceNotes.map((id,i)=>{
+        const url = mediaUrl(id);
+        return `<div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+          ${url ? `<audio controls src="${url}" style="height:32px; flex:1; min-width:0;"></audio>` : `<div class="skeleton" style="height:32px; flex:1; border-radius:8px;"></div>`}
+          <button class="icon-btn-plain" data-del-voice="${i}">${icon('trash-2',14)}</button>
+        </div>`;
+      }).join("")}
+    </div>` : ""}
+
     <div style="display:flex; align-items:center; justify-content:space-between; margin-top:12px; flex-wrap:wrap; gap:8px;">
       <span class="muted" style="font-size:11.5px;" id="journal-savedstamp">${entry.updatedAt? "Last saved "+new Date(entry.updatedAt).toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'}) : "Not saved yet"}</span>
       <button class="btn btn-primary" id="journal-save-btn">${icon("check",15)} Save Entry</button>
@@ -1295,10 +1806,11 @@ function journalTodayCardHtml(dateKey){
 function journalHistoryRowHtml(dateKey){
   const entry = state.journal.entries[dateKey];
   const preview = (entry.text||"").slice(0,120);
+  const hasMedia = (entry.images||[]).length>0 || (entry.voiceNotes||[]).length>0;
   return `<div class="item-row" style="cursor:pointer; align-items:flex-start;" data-open-journal="${dateKey}">
     <div style="width:34px; height:34px; border-radius:10px; background:var(--accent-soft); color:var(--accent); display:flex; align-items:center; justify-content:center; flex-shrink:0;">${icon("notebook-pen",15)}</div>
     <div style="flex:1; min-width:0;">
-      <div class="item-title" style="font-size:13.5px;">${fmtDateLong(dateKey)}</div>
+      <div class="item-title" style="font-size:13.5px; display:flex; align-items:center; gap:6px;">${fmtDateLong(dateKey)} ${hasMedia?icon("paperclip",11):""}</div>
       <div class="muted" style="font-size:12.5px; margin-top:2px; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;">${escapeHtml(preview)}${entry.text && entry.text.length>120?"…":""}</div>
     </div>
   </div>`;
@@ -1312,25 +1824,121 @@ function bindJournalTodayEvents(root, dateKey){
   };
   const saveBtn = root.querySelector("#journal-save-btn");
   if(saveBtn) saveBtn.onclick = ()=>{
-    state.journal.entries[dateKey] = { text: ta.value, updatedAt: Date.now() };
+    const existing = state.journal.entries[dateKey] || {};
+    state.journal.entries[dateKey] = Object.assign({}, existing, { text: ta.value, updatedAt: Date.now() });
     save();
     const stamp = root.querySelector("#journal-savedstamp");
     if(stamp) stamp.textContent = "Last saved "+new Date().toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
     toast("Journal entry saved","notebook-pen");
   };
+  const photoBtn = root.querySelector("#journal-addphoto-btn");
+  const photoInput = root.querySelector("#journal-photo-input");
+  if(photoBtn) photoBtn.onclick = ()=> photoInput.click();
+  if(photoInput) photoInput.onchange = ()=>{
+    const file = photoInput.files[0]; if(!file) return;
+    if(file.size > 8*1024*1024){ toast("Photo too large — please use one under 8MB"); return; }
+    const id = "img-"+uid();
+    mediaPut(id, file).then(()=>{
+      mediaUrlCache.set(id, URL.createObjectURL(file));
+      const entry = state.journal.entries[dateKey] = state.journal.entries[dateKey] || {text:ta?ta.value:"", images:[], voiceNotes:[]};
+      entry.images = entry.images || [];
+      entry.images.push(id);
+      save(); rerenderCurrent(); toast("Photo added","image-plus");
+    }).catch(()=> toast("Couldn't save the photo — device storage may be unavailable"));
+    photoInput.value = "";
+  };
+  root.querySelectorAll("[data-del-image]").forEach(b=> b.onclick = ()=>{
+    const entry = state.journal.entries[dateKey]; if(!entry) return;
+    const idx = parseInt(b.dataset.delImage,10);
+    const id = entry.images[idx];
+    entry.images.splice(idx,1);
+    save(); rerenderCurrent();
+    if(id){ mediaDelete(id).catch(()=>{}); const url = mediaUrlCache.get(id); if(url){ URL.revokeObjectURL(url); mediaUrlCache.delete(id); } }
+  });
+  root.querySelectorAll("[data-view-image]").forEach(img=> img.onclick = ()=>{
+    openModal(`<div class="modal-head"><h3>Photo</h3><button class="icon-btn-plain" onclick="__closeModal()">${icon("x",20)}</button></div><img src="${img.src}" style="width:100%; border-radius:14px;"/>`);
+  });
+  const voiceBtn = root.querySelector("#journal-voice-btn");
+  if(voiceBtn) voiceBtn.onclick = ()=> toggleVoiceRecording(dateKey, voiceBtn);
+  root.querySelectorAll("[data-del-voice]").forEach(b=> b.onclick = ()=>{
+    const entry = state.journal.entries[dateKey]; if(!entry) return;
+    const idx = parseInt(b.dataset.delVoice,10);
+    const id = entry.voiceNotes[idx];
+    entry.voiceNotes.splice(idx,1);
+    save(); rerenderCurrent();
+    if(id){ mediaDelete(id).catch(()=>{}); const url = mediaUrlCache.get(id); if(url){ URL.revokeObjectURL(url); mediaUrlCache.delete(id); } }
+  });
+}
+let journalMediaRecorder = null, journalRecordingChunks = [];
+async function toggleVoiceRecording(dateKey, btn){
+  if(journalMediaRecorder && journalMediaRecorder.state==="recording"){
+    journalMediaRecorder.stop();
+    return;
+  }
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    toast("Voice recording isn't supported on this device/browser"); return;
+  }
+  try{
+    const stream = await navigator.mediaDevices.getUserMedia({audio:true});
+    journalRecordingChunks = [];
+    journalMediaRecorder = new MediaRecorder(stream);
+    journalMediaRecorder.ondataavailable = e=>{ if(e.data.size>0) journalRecordingChunks.push(e.data); };
+    journalMediaRecorder.onstop = ()=>{
+      const blob = new Blob(journalRecordingChunks, {type: journalMediaRecorder.mimeType || 'audio/webm'});
+      const id = "voice-"+uid();
+      mediaPut(id, blob).then(()=>{
+        mediaUrlCache.set(id, URL.createObjectURL(blob));
+        const entry = state.journal.entries[dateKey] = state.journal.entries[dateKey] || {text:"", images:[], voiceNotes:[]};
+        entry.voiceNotes = entry.voiceNotes || [];
+        entry.voiceNotes.push(id);
+        save(); rerenderCurrent();
+        toast("Voice note saved","mic");
+      }).catch(()=> toast("Couldn't save the voice note — device storage may be unavailable"));
+      stream.getTracks().forEach(t=>t.stop());
+      journalMediaRecorder = null;
+    };
+    journalMediaRecorder.start();
+    if(btn) btn.innerHTML = icon("square",15)+" Stop Recording";
+    toast("Recording — tap again to stop","mic");
+  }catch(e){
+    toast("Microphone access unavailable or was denied");
+  }
+}
+function journalModalMediaHtml(entry){
+  return `
+    ${(entry.images||[]).length ? `<div style="display:flex; gap:8px; flex-wrap:wrap; margin-top:12px;">${entry.images.map(id=>{
+      const url = mediaUrl(id);
+      return url ? `<img src="${url}" style="width:60px;height:60px;object-fit:cover;border-radius:10px;"/>` : `<div class="skeleton" style="width:60px;height:60px;border-radius:10px;"></div>`;
+    }).join("")}</div>` : ""}
+    ${(entry.voiceNotes||[]).length ? `<div style="margin-top:12px;">${entry.voiceNotes.map(id=>{
+      const url = mediaUrl(id);
+      return url ? `<audio controls src="${url}" style="width:100%; height:32px; margin-bottom:6px;"></audio>` : `<div class="skeleton" style="height:32px; border-radius:8px; margin-bottom:6px;"></div>`;
+    }).join("")}</div>` : ""}
+  `;
 }
 function openJournalEntryModal(dateKey){
-  const entry = state.journal.entries[dateKey] || {text:""};
+  const entry = state.journal.entries[dateKey] || {text:"", images:[], voiceNotes:[]};
+  const mediaIds = [...(entry.images||[]), ...(entry.voiceNotes||[])];
   openModal(`
     <div class="modal-head"><h3>${fmtDateLong(dateKey)}</h3><button class="icon-btn-plain" onclick="__closeModal()">${icon("x",20)}</button></div>
-    <textarea id="jm-textarea" style="min-height:260px; line-height:1.6;">${escapeHtml(entry.text||"")}</textarea>
+    <textarea id="jm-textarea" style="min-height:220px; line-height:1.6;">${escapeHtml(entry.text||"")}</textarea>
+    <div id="jm-media">${journalModalMediaHtml(entry)}</div>
     <div class="row" style="margin-top:14px;">
       <button class="btn btn-danger" id="jm-delete">Delete</button>
       <button class="btn btn-primary" id="jm-save" style="flex:2;">Save Changes</button>
     </div>
   `);
+  if(mediaIds.length){
+    ensureMediaUrls(mediaIds).then(changed=>{
+      if(changed){
+        const mediaEl = document.getElementById("jm-media");
+        if(mediaEl) mediaEl.innerHTML = journalModalMediaHtml(entry);
+      }
+    });
+  }
   document.getElementById("jm-save").onclick = ()=>{
-    state.journal.entries[dateKey] = { text: document.getElementById("jm-textarea").value, updatedAt: Date.now() };
+    const existing = state.journal.entries[dateKey] || {};
+    state.journal.entries[dateKey] = Object.assign({}, existing, { text: document.getElementById("jm-textarea").value, updatedAt: Date.now() });
     save(); closeModal(); rerenderCurrent(); toast("Entry updated","check");
   };
   document.getElementById("jm-delete").onclick = ()=>{
@@ -1470,8 +2078,10 @@ function openMedModal(){
   document.getElementById("mf-save").onclick = ()=>{
     const name = document.getElementById("mf-name").value.trim();
     if(!name){ toast("Enter a name"); return; }
-    state.medicines.push({id:uid(), name, dosage:document.getElementById("mf-dosage").value.trim(), time:document.getElementById("mf-time").value});
+    const t = document.getElementById("mf-time").value;
+    state.medicines.push({id:uid(), name, dosage:document.getElementById("mf-dosage").value.trim(), time:t});
     save(); closeModal(); rerenderCurrent(); toast("Added","pill");
+    if(t) ensureNotifPermission();
   };
 }
 
@@ -1592,6 +2202,73 @@ function renderCalDetail(){
 /* =========================================================
    VIEW: INSIGHTS
    ========================================================= */
+function weekStats(days){
+  const completion = Math.round(days.reduce((s,d)=>s+dayCompletionPct(d),0)/days.length);
+  const waterAvg = Math.round(days.reduce((s,d)=>s+(state.water.logs[d]||0),0)/days.length);
+  const focusTotal = days.reduce((s,d)=>s+(state.pomodoro.sessions[d]||0),0);
+  const workoutDays = days.filter(d=>state.workouts.some(w=>w.date===d)).length;
+  const moodVals = days.map(d=>(state.mood.logs[d]||{}).value).filter(Boolean);
+  const moodAvg = moodVals.length ? Math.round(moodVals.reduce((a,b)=>a+b,0)/moodVals.length*10)/10 : null;
+  const habitRate = state.habits.length ? Math.round(days.reduce((s,d)=>{
+    const done = state.habits.filter(h=>(state.habitLogs[d]||{})[h.id]).length;
+    return s + (done/state.habits.length*100);
+  },0)/days.length) : 0;
+  return {completion, waterAvg, focusTotal, workoutDays, moodAvg, habitRate};
+}
+function trendArrow(curr, prev){
+  if(prev===null || curr===null) return "";
+  const diff = curr-prev;
+  if(Math.abs(diff)<1) return `<span class="muted" style="font-size:11px;">— steady</span>`;
+  const up = diff>0;
+  return `<span style="font-size:11px; font-weight:700; color:${up?'var(--accent)':'var(--danger)'};">${up?'↑':'↓'} ${Math.abs(Math.round(diff))}</span>`;
+}
+function weeklyReportCardHtml(){
+  const thisWeek = lastNDays(7);
+  const lastWeek = lastNDays(14).slice(0,7);
+  const cur = weekStats(thisWeek);
+  const prev = weekStats(lastWeek);
+  const habitBest = state.habits.slice().sort((a,b)=> habitStreak(b.id,todayKey())-habitStreak(a.id,todayKey()))[0];
+  let narrative = `You completed <strong>${cur.completion}%</strong> of your daily items this week`;
+  narrative += prev.completion ? (cur.completion>=prev.completion ? `, up from ${prev.completion}% last week.` : `, down from ${prev.completion}% last week.`) : ".";
+  if(habitBest && habitStreak(habitBest.id,todayKey())>0){
+    narrative += ` Your strongest streak is <strong>${escapeHtml(habitBest.name)}</strong> at ${habitStreak(habitBest.id,todayKey())} days.`;
+  }
+  narrative += cur.workoutDays>0 ? ` You worked out ${cur.workoutDays} day${cur.workoutDays===1?'':'s'} this week.` : ` No workouts logged this week yet.`;
+  return `
+  <div class="card" style="margin-top:18px; background:linear-gradient(155deg,var(--accent-soft),var(--card));">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+      <div style="font-family:'Fraunces',serif; font-weight:600; font-size:17px; display:flex; align-items:center; gap:8px;">${icon("scroll-text",17)} Weekly Report</div>
+      <span class="muted" style="font-size:11.5px;">${fmtDateLong(lastNDays(7)[0])} – ${fmtDateLong(todayKey())}</span>
+    </div>
+    <p style="font-size:14px; line-height:1.6; margin:0 0 14px;">${narrative}</p>
+    <div class="grid grid-3" style="gap:10px;">
+      <div class="card-tight" style="background:var(--card); border-radius:14px;">
+        <div class="muted" style="font-size:11px;">Completion</div>
+        <div style="display:flex; align-items:baseline; gap:6px;"><span class="mono" style="font-weight:700; font-size:17px;">${cur.completion}%</span>${trendArrow(cur.completion,prev.completion)}</div>
+      </div>
+      <div class="card-tight" style="background:var(--card); border-radius:14px;">
+        <div class="muted" style="font-size:11px;">Habit consistency</div>
+        <div style="display:flex; align-items:baseline; gap:6px;"><span class="mono" style="font-weight:700; font-size:17px;">${cur.habitRate}%</span>${trendArrow(cur.habitRate,prev.habitRate)}</div>
+      </div>
+      <div class="card-tight" style="background:var(--card); border-radius:14px;">
+        <div class="muted" style="font-size:11px;">Avg water</div>
+        <div style="display:flex; align-items:baseline; gap:6px;"><span class="mono" style="font-weight:700; font-size:17px;">${cur.waterAvg}ml</span>${trendArrow(cur.waterAvg,prev.waterAvg)}</div>
+      </div>
+      <div class="card-tight" style="background:var(--card); border-radius:14px;">
+        <div class="muted" style="font-size:11px;">Focus time</div>
+        <div style="display:flex; align-items:baseline; gap:6px;"><span class="mono" style="font-weight:700; font-size:17px;">${Math.round(cur.focusTotal/60*10)/10}h</span>${trendArrow(cur.focusTotal,prev.focusTotal)}</div>
+      </div>
+      <div class="card-tight" style="background:var(--card); border-radius:14px;">
+        <div class="muted" style="font-size:11px;">Workout days</div>
+        <div style="display:flex; align-items:baseline; gap:6px;"><span class="mono" style="font-weight:700; font-size:17px;">${cur.workoutDays}/7</span>${trendArrow(cur.workoutDays,prev.workoutDays)}</div>
+      </div>
+      <div class="card-tight" style="background:var(--card); border-radius:14px;">
+        <div class="muted" style="font-size:11px;">Avg mood</div>
+        <div style="display:flex; align-items:baseline; gap:6px;"><span class="mono" style="font-weight:700; font-size:17px;">${cur.moodAvg!==null?cur.moodAvg+'/5':'—'}</span>${trendArrow(cur.moodAvg,prev.moodAvg)}</div>
+      </div>
+    </div>
+  </div>`;
+}
 function renderInsights(){
   const root = document.getElementById("view-root");
   const week = lastNDays(7);
@@ -1609,6 +2286,8 @@ function renderInsights(){
 
   root.innerHTML = `
     <div class="hero"><div><h1>Insights</h1><div class="sub">The last 7 days, at a glance.</div></div></div>
+
+    ${weeklyReportCardHtml()}
 
     <div class="grid grid-3" style="margin-top:18px;">
       <div class="card card-tight"><div class="muted" style="font-size:11.5px;">Weekly completion</div><div class="display" style="font-size:26px;">${overallWeekCompletion}%</div></div>
@@ -1742,11 +2421,36 @@ function renderSettings(){
       <div class="row"><input type="text" id="st-newcat" placeholder="New category"/><button class="btn btn-soft" id="st-addcat">Add</button></div>
     </div>
 
+    <div class="section-title"><h2>Journal Privacy</h2></div>
+    <div class="card">
+      <div class="linkline">
+        <span>Lock the journal</span>
+        <label class="switch"><input type="checkbox" id="jl-enabled" ${s.journalLockEnabled?'checked':''}/><span class="slider"></span></label>
+      </div>
+      <div class="field" style="margin-top:12px; margin-bottom:6px;">
+        <label class="field-label">Unlock method</label>
+        <div class="segmented">
+          <button data-unlock-method="pin" class="${(s.journalUnlockMethod||'pin')==='pin'?'active':''}">PIN</button>
+          <button data-unlock-method="device" class="${s.journalUnlockMethod==='device'?'active':''}" ${DEVICE_UNLOCK_SUPPORTED?'':'disabled style="opacity:.4;"'}>Face ID / Fingerprint</button>
+        </div>
+        ${!DEVICE_UNLOCK_SUPPORTED?`<p class="muted" style="font-size:11px; margin-top:6px;">Device unlock isn't available on this browser/device — PIN is used instead.</p>`:''}
+      </div>
+      <div class="row" style="margin-top:10px;">
+        ${(s.journalUnlockMethod||'pin')==='device'
+          ? `<button class="btn btn-ghost" id="jl-setdevice" style="width:100%;">${icon("fingerprint",14)} ${s.journalWebAuthnCredId?"Re-register Device Unlock":"Set Up Device Unlock"}</button>`
+          : `<button class="btn btn-ghost" id="jl-setpin" style="width:100%;">${icon("lock",14)} ${s.journalPinHash?"Change PIN":"Set PIN"}</button>`
+        }
+      </div>
+      <p class="muted" style="font-size:11.5px; margin-top:10px;">This is a casual privacy screen for shared devices, not high-security encryption — your journal data itself is always stored locally on this device. Device unlock uses your phone's own Face ID/fingerprint/screen-lock check; Daybook never sees your biometric data.</p>
+    </div>
+
     <div class="section-title"><h2>Notifications</h2></div>
     <div class="card">
       <div class="linkline"><span>Task reminders</span><label class="switch"><input type="checkbox" id="nt-tasks" ${s.notifTasks?'checked':''}/><span class="slider"></span></label></div>
+      <div class="linkline"><span>Medicine reminders</span><label class="switch"><input type="checkbox" id="nt-meds" ${s.notifMeds?'checked':''}/><span class="slider"></span></label></div>
       <div class="linkline"><span>Water reminders</span><label class="switch"><input type="checkbox" id="nt-water" ${s.notifWater?'checked':''}/><span class="slider"></span></label></div>
       <div class="linkline"><span>Habit reminders</span><label class="switch"><input type="checkbox" id="nt-habits" ${s.notifHabits?'checked':''}/><span class="slider"></span></label></div>
+      <div class="linkline"><span>Enable browser notifications</span><button class="btn btn-soft" id="nt-enable" style="padding:6px 12px; font-size:12.5px;">${("Notification" in window && Notification.permission==="granted")?"Enabled ✓":"Enable"}</button></div>
       <div class="linkline"><span>Notification sound</span><label class="switch"><input type="checkbox" id="nt-sound" ${s.notifSound?'checked':''}/><span class="slider"></span></label></div>
       <div class="field" style="margin-top:12px;">
         <label class="field-label">Sound</label>
@@ -1804,12 +2508,40 @@ function renderSettings(){
   root.querySelectorAll("[data-del-cat]").forEach(b=> b.onclick = ()=>{
     state.categories = state.categories.filter(c=>c!==b.dataset.delCat); save(); renderSettings();
   });
-  ["tasks","water","habits","sound"].forEach(k=>{
-    document.getElementById("nt-"+k).onchange = e=>{ s["notif"+k.charAt(0).toUpperCase()+k.slice(1)] = e.target.checked; save(); };
+  document.getElementById("jl-enabled").onchange = e=>{
+    const method = s.journalUnlockMethod || "pin";
+    const hasCred = method==="device" ? s.journalWebAuthnCredId : s.journalPinHash;
+    if(e.target.checked && !hasCred){
+      e.target.checked = false;
+      toast(method==="device" ? "Set up device unlock first" : "Set a PIN first");
+      if(method==="device") setupDeviceUnlock().then(ok=>{ if(ok){ toast("Device unlock set up","fingerprint"); renderSettings(); } });
+      else openJournalPinModal(true);
+      return;
+    }
+    s.journalLockEnabled = e.target.checked;
+    if(!s.journalLockEnabled) ui.journalUnlocked = true;
+    save();
+  };
+  root.querySelectorAll("[data-unlock-method]").forEach(b=> b.onclick = ()=>{
+    if(b.disabled) return;
+    s.journalUnlockMethod = b.dataset.unlockMethod;
+    save(); renderSettings();
+  });
+  const setPinBtn = document.getElementById("jl-setpin");
+  if(setPinBtn) setPinBtn.onclick = ()=> openJournalPinModal(false);
+  const setDeviceBtn = document.getElementById("jl-setdevice");
+  if(setDeviceBtn) setDeviceBtn.onclick = async ()=>{
+    const ok = await setupDeviceUnlock();
+    if(ok){ toast("Device unlock set up","fingerprint"); renderSettings(); }
+    else toast("Setup was cancelled or failed");
+  };
+  ["tasks","meds","water","habits","sound"].forEach(k=>{
+    document.getElementById("nt-"+k).onchange = e=>{ s["notif"+k.charAt(0).toUpperCase()+k.slice(1)] = e.target.checked; save(); if(e.target.checked) ensureNotifPermission(); };
   });
   document.getElementById("nt-soundchoice").onchange = e=>{ s.soundChoice=e.target.value; save(); };
   document.getElementById("nt-testsound").onclick = ()=>playSound();
   document.getElementById("nt-testnotif").onclick = ()=> requestNotifPermissionThenTest();
+  document.getElementById("nt-enable").onclick = ()=>{ requestNotifPermissionThenTest(); setTimeout(renderSettings, 400); };
   document.getElementById("st-quotepref").onchange = e=>{ s.quotePref=e.target.value; save(); };
   document.getElementById("data-export").onclick = exportData;
   document.getElementById("data-import-btn").onclick = ()=> document.getElementById("data-import-file").click();
@@ -1885,6 +2617,14 @@ function notify(title, body){
   }
   toast(title+(body?" — "+body:""), "bell");
 }
+function ensureNotifPermission(){
+  if(!("Notification" in window)) return;
+  if(Notification.permission==="default"){
+    Notification.requestPermission().then(p=>{
+      if(p==="granted") toast("Reminders enabled","bell");
+    });
+  }
+}
 
 /* =========================================================
    ROUTER / RENDER
@@ -1896,6 +2636,7 @@ function render(){
     case "home": renderHome(); break;
     case "tasks": renderTasks(); break;
     case "habits": renderHabits(); break;
+    case "goals": renderGoals(); break;
     case "focus": renderFocus(); break;
     case "journal": renderJournal(); break;
     case "health": renderHealth(); break;
@@ -1907,24 +2648,126 @@ function render(){
 }
 
 /* ---------------- init ---------------- */
+/* ---------------- first-run onboarding ---------------- */
+const ONBOARD_HABIT_SUGGESTIONS = [
+  {name:"Workout", icon:"dumbbell"}, {name:"Read", icon:"book-open"}, {name:"Meditate", icon:"brain"},
+  {name:"Study", icon:"graduation-cap"}, {name:"Sleep on time", icon:"moon"}, {name:"No junk food", icon:"apple"},
+];
+function openOnboardingModal(){
+  openModal(`
+    <div class="modal-head"><h3>Welcome to Daybook 👋</h3></div>
+    <p class="muted" style="font-size:13px; margin-top:-8px; margin-bottom:16px;">Let's set a few things up. Everything here can be changed anytime later.</p>
+
+    <div class="field"><label class="field-label">Your name</label><input type="text" id="ob-name" placeholder="e.g. Alex" value="${escapeHtml(state.user.name||'')}"/></div>
+    <div class="field"><label class="field-label">Pick an avatar</label>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        ${["🌿","🌸","☀️","🌙","🔥","🐣","🌊","⭐","🍃","🦋"].map(e=>`<button class="btn-icon" data-ob-avatar="${e}" style="font-size:17px; ${state.user.avatarEmoji===e?'background:var(--accent-soft);border-color:var(--accent);':''}">${e}</button>`).join("")}
+      </div>
+    </div>
+    <div class="field"><label class="field-label">Daily water goal (ml)</label><input type="number" id="ob-water" value="${state.settings.waterGoalMl}" step="250"/></div>
+    <div class="field"><label class="field-label">Habits you want to track</label>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        ${ONBOARD_HABIT_SUGGESTIONS.map(h=>`<button class="btn-icon" data-ob-habit="${escapeHtml(h.name)}" data-ob-icon="${h.icon}" style="width:auto;padding:0 12px;gap:6px;display:inline-flex;align-items:center;">${icon(h.icon,15)} ${h.name}</button>`).join("")}
+      </div>
+    </div>
+    <div class="field"><label class="field-label">A main goal (optional)</label><input type="text" id="ob-goal" placeholder="e.g. Prepare for finals, Ship the redesign"/></div>
+    <div class="field"><label class="field-label">First task for today (optional)</label><input type="text" id="ob-task" placeholder="e.g. Plan the week"/></div>
+    <div class="field"><label class="field-label">A medicine/supplement to track (optional)</label><input type="text" id="ob-med" placeholder="e.g. Vitamin D"/></div>
+
+    <div class="row" style="margin-top:8px;">
+      <button class="btn btn-ghost" id="ob-skip">Skip for now</button>
+      <button class="btn btn-primary" id="ob-done" style="flex:2;">${icon("check",15)} Get Started</button>
+    </div>
+  `);
+  let selectedAvatar = state.user.avatarEmoji || "🌿";
+  let selectedHabits = [];
+  document.querySelectorAll("[data-ob-avatar]").forEach(b=> b.onclick = ()=>{
+    selectedAvatar = b.dataset.obAvatar;
+    document.querySelectorAll("[data-ob-avatar]").forEach(x=>x.style.cssText="font-size:17px;");
+    b.style.cssText = "font-size:17px;background:var(--accent-soft);border-color:var(--accent);";
+  });
+  document.querySelectorAll("[data-ob-habit]").forEach(b=> b.onclick = ()=>{
+    const name = b.dataset.obHabit;
+    const idx = selectedHabits.indexOf(name);
+    if(idx>=0){ selectedHabits.splice(idx,1); b.style.cssText="width:auto;padding:0 12px;gap:6px;display:inline-flex;align-items:center;"; }
+    else{ selectedHabits.push(name); b.style.cssText="width:auto;padding:0 12px;gap:6px;display:inline-flex;align-items:center;background:var(--accent-soft);color:var(--accent);border-color:var(--accent);"; }
+  });
+  const finish = ()=>{ state.onboarded = true; save(); closeModal(); rerenderCurrent(); renderShell(); };
+  document.getElementById("ob-skip").onclick = finish;
+  document.getElementById("ob-done").onclick = ()=>{
+    const name = document.getElementById("ob-name").value.trim();
+    if(name) state.user.name = name;
+    state.user.avatarEmoji = selectedAvatar;
+    state.settings.waterGoalMl = parseInt(document.getElementById("ob-water").value,10) || state.settings.waterGoalMl;
+    selectedHabits.forEach(name=>{
+      const meta = ONBOARD_HABIT_SUGGESTIONS.find(h=>h.name===name);
+      if(!state.habits.some(h=>h.name===name)) state.habits.push({id:uid(), name, icon:meta?meta.icon:"circle", createdAt:todayKey()});
+    });
+    const goalTitle = document.getElementById("ob-goal").value.trim();
+    if(goalTitle) state.goals.push({id:uid(), title:goalTitle, type:"personal", deadline:"", status:"active", progress:0, topics:[], createdAt:todayKey()});
+    const taskTitle = document.getElementById("ob-task").value.trim();
+    if(taskTitle) state.tasks.push({id:uid(), title:taskTitle, description:"", date:todayKey(), time:"", priority:"med", category:"", completed:false});
+    const medName = document.getElementById("ob-med").value.trim();
+    if(medName) state.medicines.push({id:uid(), name:medName, dosage:"", time:""});
+    finish();
+    toast("You're all set!","sparkles");
+  };
+}
 function init(){
   applyTheme();
   render();
+  if(!state.onboarded){ setTimeout(openOnboardingModal, 350); }
   // Sync pomodoro remaining with settings on first load
   ui.pomodoro.remaining = state.settings.pomodoroFocusMin*60;
   // register service worker gracefully
   if("serviceWorker" in navigator){
     navigator.serviceWorker.register("sw.js").catch(()=>{ /* ignore if unavailable in this environment */ });
   }
-  // lightweight periodic check for demo reminders (does not persist across reload)
-  setInterval(()=>{
-    if(!state.settings.notifTasks) return;
-    const now = new Date(); const hhmm = String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
-    if(now.getSeconds()!==0) return;
-    state.tasks.filter(t=>t.reminder && !t.completed && t.date===todayKey() && t.time===hhmm).forEach(t=>{
-      notify("Task reminder", t.title);
+  startReminderEngine();
+  checkDeviceUnlockSupport();
+  migrateBase64MediaToIndexedDB();
+}
+/* ---------------- reminder engine (fixed) ----------------
+   Runs every 15s (not gated to an exact second) and dedupes with
+   a fired-set so a throttled/background tab still catches reminders
+   without spamming repeats. */
+const firedReminders = new Set();
+function startReminderEngine(){
+  checkReminders();
+  setInterval(checkReminders, 15000);
+}
+function checkReminders(){
+  const now = new Date();
+  const hhmm = String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
+  const today = todayKey();
+  if(state.settings.notifTasks){
+    state.tasks.filter(t=>t.reminder && !t.completed && t.date===today && t.time).forEach(t=>{
+      const key = "task-"+t.id+"-"+today;
+      if(!firedReminders.has(key) && hhmm>=t.time){
+        firedReminders.add(key);
+        notify("Task reminder", t.title);
+      }
     });
-  }, 1000);
+  }
+  if(state.settings.notifMeds){
+    const medLog = state.medicineLogs[today]||{};
+    state.medicines.filter(m=>m.time && !medLog[m.id]).forEach(m=>{
+      const key = "med-"+m.id+"-"+today;
+      if(!firedReminders.has(key) && hhmm>=m.time){
+        firedReminders.add(key);
+        notify("Medicine reminder", m.name+(m.dosage?" — "+m.dosage:""));
+      }
+    });
+  }
+  if(state.settings.notifFocusSessions !== false){
+    state.focusSessions.filter(s=>!s.completed && s.date===today && s.startTime).forEach(s=>{
+      const key = "session-"+s.id+"-"+today;
+      if(!firedReminders.has(key) && hhmm>=s.startTime){
+        firedReminders.add(key);
+        notify("Session reminder", (s.label||sessionTypeMeta(s.type).label)+" is scheduled now");
+      }
+    });
+  }
 }
 document.addEventListener("DOMContentLoaded", init);
 })();
