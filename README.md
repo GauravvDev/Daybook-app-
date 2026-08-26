@@ -1,48 +1,45 @@
 # Daybook
 
-**Track your day. Understand yourself. Build a better life.**
+Honestly? I built this for myself. I kept trying to track my routine — tasks, habits, water, whatever — and kept bouncing off apps that felt like spreadsheets wearing a productivity costume. So I made something calmer. Something I'd actually open every day instead of abandoning after a week.
 
-Daybook is a personal daily-life tracker designed to feel like a calm command center, not another productivity app fighting for your attention.
-
-## Features
-
-- **Tasks & Habits** — custom tasks with priorities and categories, plus habit tracking with streaks and a weekly grid
-- **Focus** — a built-in Pomodoro timer with adjustable durations, and the ability to book dedicated time slots for study or deep work
-- **Journal** — a private, free-form space to write about your day, browsable by date
-- **Health** — water, sleep, mood, workouts, and medicine/supplement tracking in one place
-- **Insights & Calendar** — simple charts to spot trends, and a calendar to look back on any past day
-- **Fully customizable** — rearrange or hide dashboard sections, pick your accent color, switch dark/light mode
-
-Everything is saved privately on your own device — no accounts, no ads, no tracking. Installable as an app on any phone or desktop.
+Turns out it grew into a full daily companion. Track your day, understand yourself a bit better, build some discipline — that's really the whole idea.
 
 ## Try it
 
-Live app: **[https://gauravvxcore-debug.github.io/Daybook-app-/](https://gauravvxcore-debug.github.io/Daybook-app-/)**
+👉 **[Open Daybook](https://gauravvdev.github.io/Daybook-app-/)**
 
-## Install as an app
+## What's actually in here
 
-- **Android / Desktop Chrome:** open the link above, then tap the install icon in the address bar (or the browser menu → "Install app" / "Add to Home Screen").
-- **iPhone (Safari):** open the link, tap the Share icon, then "Add to Home Screen".
+**Tasks & Habits.** The basics, done well — priorities, categories, and streaks that make you not want to break the chain.
 
-## Run it locally
+**Goals.** For the bigger stuff. A project at work, an exam you're prepping for — break it into topics, check them off, watch the progress bar move instead of just hoping you're on track.
 
-No build step, no dependencies — it's a single static site.
+**Focus.** A Pomodoro timer, but you can also book actual time slots ahead of time — "Study 4-6pm" — so your day has some shape to it.
+
+**Journal.** This one's just for you. Write whatever, attach a photo or a voice note if text doesn't cut it that day. Lock it with a PIN or your face/fingerprint if it's on a shared device.
+
+**Health.** Water, sleep, mood, workouts, meds — the stuff that's easy to forget to log but matters most.
+
+**Insights.** A weekly report that actually tells you something, not just a wall of numbers.
+
+**Make it yours.** Rearrange the dashboard, pick your accent color, switch to dark mode at 11pm like the rest of us.
+
+## The part I actually care about
+
+There's no sign-up. No ads. Nothing gets sent anywhere — it all just lives on your device, and it installs like a real app on your phone. I wanted something private, not another service quietly collecting my mood logs.
+
+## Run it yourself
+
+No build step, no dependencies. It's just HTML, CSS, and JS being honest about what it is.
 
 ```bash
-git clone https://github.com/gauravvxcore-debug/Daybook-app-.git
+git clone https://github.com/GauravvDev/Daybook-app-.git
 cd Daybook-app-
 python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
-## Tech
-
-Plain HTML, CSS, and JavaScript — no framework, no build tools. Data is stored locally in the browser via `localStorage`. Ships with a web app manifest and service worker for offline use and installability (PWA).
-
-## Data & privacy
-
-All data stays on your own device. There is no server, no account system, and no data collection. Use **Settings → Data → Export** to back up your data as a JSON file, or **Import** to restore it.
-
 ## License
 
-[MIT](LICENSE)
+[MIT](LICENSE). Take it, break it, make it better than I did.
+
