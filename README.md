@@ -18,7 +18,11 @@ Turns out it grew into a full daily companion. Track your day, understand yourse
 
 **Journal :** This one's just for you. Write whatever, attach a photo or a voice note if text doesn't cut it that day. Lock it with a PIN or your face/fingerprint if it's on a shared device.
 
+When you want it out of the app, **Export book** turns any stretch of your journal into a single self-contained HTML file — writing, photos and playable voice notes all baked in, laid out like a printed book. Send it to someone, keep it as a backup, or hit print inside it for a PDF.
+
 **Health :** Water, sleep, mood, workouts, meds — the stuff that's easy to forget to log but matters most.
+
+**Cycle :** Optional, and off unless you turn it on. Period logging with flow and symptoms, mood and PMS notes, a colour-coded calendar, and next-period / fertile-window estimates that learn from your own averages. Same rule as everything else here — it stays on your device.
 
 **Insights :** A weekly report that actually tells you something, not just a wall of numbers.
 
@@ -27,6 +31,8 @@ Turns out it grew into a full daily companion. Track your day, understand yourse
 ## The part I actually care about
 
 There's no sign-up. No ads. Nothing gets sent anywhere it all just lives on your device, and it installs like a real app on your phone. I wanted something private, not another service quietly collecting my mood logs.
+
+**Your data, plainly :** No sign-up, no server, no analytics, no ads. Everything is written to your browser's own storage on your own device — which also means it doesn't sync between devices, and clearing your browsing data clears it. There's a one-tap JSON export for backups, and the app asks your browser to protect its storage from automatic cleanup. Terms of Use, Privacy Policy and a Health Disclaimer live in Settings → About & Legal.
 
 ## Run it yourself
 
@@ -42,4 +48,3 @@ python3 -m http.server 8000
 ## License
 
 [MIT](LICENSE). Take it, break it, make it better than I did.
-
