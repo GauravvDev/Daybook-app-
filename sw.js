@@ -9,8 +9,9 @@
  *     cache immediately and refreshed in the background. Those rarely change
  *     and speed matters more than freshness.
  */
-const CACHE_NAME = "daybook-cache-v5";
-const SHELL = ["./", "./index.html", "./manifest.json", "./icon.svg"];
+const CACHE_NAME = "daybook-cache-v6";
+const SHELL = ["./", "./index.html", "./manifest.json", "./icon.svg",
+               "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png"];
 const NETWORK_TIMEOUT_MS = 3500;
 
 self.addEventListener("install", (event) => {
