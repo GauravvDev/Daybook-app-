@@ -1,4 +1,4 @@
-const CACHE_NAME = "daybook-cache-v1";
+const CACHE_NAME = "daybook-cache-v4";
 const ASSETS = ["./", "./index.html", "./manifest.json", "./icon.svg"];
 
 self.addEventListener("install", (event) => {
