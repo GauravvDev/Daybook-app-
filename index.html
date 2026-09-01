@@ -8,7 +8,14 @@
 <meta name="theme-color" content="#4F7A68" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon.svg" type="image/svg+xml" />
-<link rel="apple-touch-icon" href="icon.svg" />
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png" />
+<!-- iOS ignores manifest icons and cannot read SVG here: without a PNG it puts a
+     screenshot of the page on the Home Screen. -->
+<link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-title" content="Daybook" />
+<meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
@@ -417,7 +424,8 @@ function defaultState(){
       notifTasks:true, notifWater:true, notifHabits:true, notifMeds:true, notifSound:true, soundChoice:"chime", quotePref:"mixed",
       journalLockEnabled:false, journalPinHash:null, journalUnlockMethod:"pin", journalWebAuthnCredId:null,
       cycleTrackingEnabled:false, notifCycle:true, cycleReminderDays:2, avgCycleLengthOverride:null, avgPeriodLengthOverride:null,
-      legalAcceptedVersion:null, legalAcceptedAt:null, lastExportAt:null, backupNudgeDismissedAt:null },
+      legalAcceptedVersion:null, legalAcceptedAt:null, lastExportAt:null, backupNudgeDismissedAt:null,
+      installNudgeDismissedAt:null, firstRunAt:null },
     categories:["Personal","Work","Study","Errands"],
     tasks:[
       {id:uid(), title:"Plan tomorrow's priorities", description:"", date:today, time:"20:30", priority:"low", category:"Personal", completed:false},
@@ -772,6 +780,23 @@ function renderHome(){
       </div>
     </div>
 
+    ${shouldNudgeInstall()? `
+    <div class="card" style="margin-top:18px; border-color:var(--accent); background:var(--accent-soft);">
+      <div style="display:flex; gap:12px; align-items:flex-start;">
+        <span style="color:var(--accent); flex-shrink:0; margin-top:1px;">${icon("smartphone",18)}</span>
+        <div style="flex:1;">
+          <div style="font-weight:700; font-size:13.5px; margin-bottom:3px;">Add Daybook to your Home Screen</div>
+          <div class="muted" style="font-size:12.5px; line-height:1.55;">
+            On iPhone, Safari erases a site's saved data after about a week of not opening it &mdash; that would take your journal with it. Apps on the Home Screen are exempt, so this one step is what keeps your entries safe.
+            <div style="margin-top:7px; color:var(--ink);">Tap ${icon("share",13)} <strong>Share</strong>, then <strong>Add to Home Screen</strong>.</div>
+          </div>
+          <div class="row" style="margin-top:11px;">
+            <button class="btn btn-ghost" id="install-dismiss">Got it</button>
+          </div>
+        </div>
+      </div>
+    </div>`:""}
+
     ${shouldNudgeBackup()? `
     <div class="card" style="margin-top:18px; border-color:var(--clay); background:var(--clay-soft);">
       <div style="display:flex; gap:12px; align-items:flex-start;">
@@ -803,6 +828,7 @@ function renderHome(){
     </div>`}
   `;
   root.querySelectorAll("[data-route]").forEach(a=>a.onclick=(e)=>{e.preventDefault(); setRoute(a.dataset.route);});
+  const instDis = document.getElementById("install-dismiss"); if(instDis) instDis.onclick = ()=>{ state.settings.installNudgeDismissedAt = Date.now(); save(); renderHome(); };
   const nudgeExp = document.getElementById("nudge-export"); if(nudgeExp) nudgeExp.onclick = ()=>{ exportData(); renderHome(); };
   const nudgeDis = document.getElementById("nudge-dismiss"); if(nudgeDis) nudgeDis.onclick = ()=>{ state.settings.backupNudgeDismissedAt = Date.now(); save(); renderHome(); };
   const custBtn = document.getElementById("customize-dash-btn"); if(custBtn) custBtn.onclick = openDashboardCustomizeModal;
@@ -3266,8 +3292,14 @@ function renderSettings(){
       <p class="muted" style="font-size:11.5px; margin-top:10px;">This is a casual privacy screen for shared devices, not high-security encryption — your journal data itself is always stored locally on this device. Device unlock uses your phone's own Face ID/fingerprint/screen-lock check; Daybook never sees your biometric data.</p>
     </div>
 
-    <div class="section-title"><h2>Notifications</h2></div>
+    <div class="section-title"><h2>Reminders</h2></div>
     <div class="card">
+      <div style="display:flex; gap:10px; align-items:flex-start; padding:12px 14px; margin-bottom:6px; background:var(--clay-soft); border:1px solid var(--clay); border-radius:12px;">
+        <span style="color:var(--clay); flex-shrink:0; margin-top:1px;">${icon("alert-triangle",16)}</span>
+        <div style="font-size:12.5px; line-height:1.55; color:var(--ink);">
+          <strong>These only appear while Daybook is open.</strong> Daybook has no server, so nothing can be pushed to your phone when the app is closed or locked. For anything you must not miss &mdash; medicines especially &mdash; set an alarm in your phone's own clock app.
+        </div>
+      </div>
       <div class="linkline"><span>Task reminders</span><label class="switch"><input type="checkbox" id="nt-tasks" ${s.notifTasks?'checked':''}/><span class="slider"></span></label></div>
       <div class="linkline"><span>Medicine reminders</span><label class="switch"><input type="checkbox" id="nt-meds" ${s.notifMeds?'checked':''}/><span class="slider"></span></label></div>
       <div class="linkline"><span>Water reminders</span><label class="switch"><input type="checkbox" id="nt-water" ${s.notifWater?'checked':''}/><span class="slider"></span></label></div>
@@ -3286,7 +3318,7 @@ function renderSettings(){
         <button class="btn btn-ghost" id="nt-testsound">${icon("volume-2",15)} Test Sound</button>
         <button class="btn btn-ghost" id="nt-testnotif">${icon("bell-ring",15)} Test Notification</button>
       </div>
-      <p class="muted" style="font-size:11.5px; margin-top:10px;">Browser notifications require permission and may not be available on every device — the app will use in-app toasts instead when unavailable.</p>
+      <p class="muted" style="font-size:11.5px; margin-top:10px;">Browser notifications need permission and are not available on every device — where they are not, Daybook shows an in-app message instead. Either way, the app has to be open.</p>
     </div>
 
     <div class="section-title"><h2>Quotes</h2></div>
@@ -3320,7 +3352,8 @@ function renderSettings(){
         <span style="font-size:13.5px;">Last backup</span>
         <span class="muted" style="font-size:12.5px;">${s.lastExportAt? fmtDateLong(todayKey(new Date(s.lastExportAt))) : "never"}</span>
       </div>
-      <p class="muted" style="font-size:11.5px; margin:12px 0 0;">Browsers can clear storage when a device runs low on space. Asking for protection makes that far less likely — and on iPhone it stops Safari discarding your data after a week of not opening the app.</p>
+      <p class="muted" style="font-size:11.5px; margin:12px 0 0;">Browsers can clear storage when a device runs low on space, and asking for protection makes that far less likely.</p>
+      ${isIOS() && !isStandalone() ? `<p class="muted" style="font-size:11.5px; margin:8px 0 0; color:var(--clay);">On iPhone there is a stronger rule: Safari erases a site's data after about a week without a visit. Adding Daybook to your Home Screen (Share &rarr; Add to Home Screen) exempts it. Until you do, keep exporting backups.</p>` : ""}
     </div>
 
     <div class="section-title"><h2>Permissions</h2></div>
@@ -3483,7 +3516,7 @@ function renderSettings(){
 /* =========================================================
    STORAGE, PERMISSIONS & LEGAL
    ========================================================= */
-const APP_VERSION = "1.2.0";
+const APP_VERSION = "1.3.0";
 const LEGAL_VERSION = "2026-09-01";
 const LEGAL_UPDATED = "1 September 2026";
 const CONTACT_EMAIL = "contact.gauravhq@gmail.com";
@@ -3525,21 +3558,45 @@ function daysSinceExport(){
   if(!state.settings.lastExportAt) return null;
   return Math.floor((Date.now()-state.settings.lastExportAt)/86400000);
 }
+/* Deliberately excludes the sample content a fresh install ships with —
+   nobody should be told to back up a journal they haven't written yet. */
 function hasMeaningfulData(){
-  return state.tasks.length>3 || Object.keys(state.journal.entries||{}).length>1
-      || Object.keys(state.habitLogs||{}).length>2 || (state.cycle && state.cycle.periods.length>0);
+  return Object.keys(state.journal.entries||{}).length>1
+      || Object.keys(state.habitLogs||{}).length>2
+      || (state.cycle && state.cycle.periods.length>0)
+      || state.tasks.length>6;
 }
 function shouldNudgeBackup(){
   if(!hasMeaningfulData()) return false;
+  const first = state.settings.firstRunAt;
+  if(!first || (Date.now()-first) < 7*86400000) return false;  // give people a week before nagging
   const dismissed = state.settings.backupNudgeDismissedAt;
   if(dismissed && (Date.now()-dismissed) < 14*86400000) return false;
   const d = daysSinceExport();
   return d===null || d>=30;
 }
 
+/* ---------- platform ---------- */
+function isIOS(){
+  return /iPad|iPhone|iPod/.test(navigator.userAgent)
+      || (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1); // iPadOS pretends to be a Mac
+}
+function isStandalone(){
+  return (window.matchMedia && window.matchMedia("(display-mode: standalone)").matches)
+      || navigator.standalone === true;
+}
+/* On iPhone, Safari wipes a site's storage after 7 days of not being opened.
+   Apps added to the Home Screen are exempt - so this is a data-safety prompt,
+   not a growth-hack banner. */
+function shouldNudgeInstall(){
+  if(!isIOS() || isStandalone()) return false;
+  const d = state.settings.installNudgeDismissedAt;
+  return !(d && (Date.now() - d) < 30*86400000);
+}
+
 /* ---------- permissions summary ---------- */
 const PERMISSIONS = [
-  {icon:"bell", name:"Notifications", why:"Only used to send the reminders you switch on — tasks, medicines, focus sessions and cycle predictions. Asked for the first time you enable a reminder."},
+  {icon:"bell", name:"Notifications", why:"Used for the reminders you switch on — tasks, medicines, focus sessions and cycle dates. Asked for the first time you enable one. Note that reminders are generated by the app itself, so they only appear while Daybook is open."},
   {icon:"mic", name:"Microphone", why:"Only used while you are recording a voice note in the Journal. Recording stops the moment you tap stop, and the audio is saved on this device."},
   {icon:"hard-drive", name:"Persistent storage", why:"Asks your browser not to auto-delete Daybook's data when the device is low on space. Strongly recommended, since your data lives only on this device."},
   {icon:"fingerprint", name:"Device unlock (Face ID / fingerprint)", why:"Optional, only if you lock your Journal. Your browser performs the check — Daybook never receives your biometric data."},
@@ -3596,7 +3653,8 @@ function legalDocHtml(id){
           "Do not use it to store other people's personal information without their knowledge.",
           "Do not use it for anything unlawful."])
     + H("No warranty")
-    + P("Daybook is provided “as is” and “as available”, without warranties of any kind, express or implied, including fitness for a particular purpose. Reminders depend on your browser and operating system and may not fire — do not rely on them for anything critical such as medication timing.")
+    + P("Daybook is provided “as is” and “as available”, without warranties of any kind, express or implied, including fitness for a particular purpose.")
+  + P("<strong>Reminders only appear while Daybook is open.</strong> They are produced by the app itself, not pushed from a server, so nothing will reach you when the app is closed or your phone is locked. Do not rely on them for anything that matters — medication timing above all. Use your phone's own alarm or reminders app for that.")
     + H("Limitation of liability")
     + P("To the maximum extent permitted by law, the developer is not liable for any loss of data, missed reminder, or any indirect or consequential loss arising from your use of Daybook.")
     + H("Open source")
@@ -3611,7 +3669,8 @@ function legalDocHtml(id){
   return STAMP
   + P("<strong>Daybook is not a medical device and does not provide medical advice.</strong>")
   + H("General health tracking")
-  + P("Water, sleep, mood, workout and medicine entries are a personal diary. Daybook does not diagnose anything, does not check your entries for safety, and its reminders are a convenience, not a clinical alert system. Never rely on a Daybook reminder for medication or treatment timing.")
+  + P("Water, sleep, mood, workout and medicine entries are a personal diary. Daybook does not diagnose anything and does not check your entries for safety.")
+  + P("<strong>Medicine reminders only appear while the app is open on screen.</strong> They are not a clinical alert system and will not wake your phone. Never rely on a Daybook reminder for medication or treatment timing — set a real alarm.")
   + H("Menstrual cycle predictions")
   + P("Predicted period dates, fertile windows and ovulation days are simple arithmetic based on the averages of what you have logged. They are estimates only.")
   + UL(["<strong>Not contraception.</strong> Do not use the fertile window to plan or avoid pregnancy.",
@@ -3743,7 +3802,7 @@ function requestNotifPermissionThenTest(){
 function notify(title, body){
   playSound();
   if("Notification" in window && Notification.permission==="granted"){
-    try{ new Notification(title, {body, icon:"icon.svg"}); return; }catch(e){}
+    try{ new Notification(title, {body, icon:"icon-192.png"}); return; }catch(e){}
   }
   toast(title+(body?" — "+body:""), "bell");
 }
@@ -3886,6 +3945,7 @@ function openOnboardingModal(){
 function init(){
   applyTheme();
   render();
+  if(!state.settings.firstRunAt){ state.settings.firstRunAt = Date.now(); save(); }
   if(!state.onboarded){ setTimeout(openOnboardingModal, 350); }
   else if(!legalAccepted()){ setTimeout(openLegalConsentModal, 350); }
   checkStoragePersisted();
