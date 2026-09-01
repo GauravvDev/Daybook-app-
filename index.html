@@ -416,7 +416,8 @@ function defaultState(){
     settings:{ waterGoalMl:2500, sleepGoalHrs:8, pomodoroFocusMin:25, pomodoroBreakMin:5,
       notifTasks:true, notifWater:true, notifHabits:true, notifMeds:true, notifSound:true, soundChoice:"chime", quotePref:"mixed",
       journalLockEnabled:false, journalPinHash:null, journalUnlockMethod:"pin", journalWebAuthnCredId:null,
-      cycleTrackingEnabled:false, notifCycle:true, cycleReminderDays:2, avgCycleLengthOverride:null, avgPeriodLengthOverride:null },
+      cycleTrackingEnabled:false, notifCycle:true, cycleReminderDays:2, avgCycleLengthOverride:null, avgPeriodLengthOverride:null,
+      legalAcceptedVersion:null, legalAcceptedAt:null, lastExportAt:null, backupNudgeDismissedAt:null },
     categories:["Personal","Work","Study","Errands"],
     tasks:[
       {id:uid(), title:"Plan tomorrow's priorities", description:"", date:today, time:"20:30", priority:"low", category:"Personal", completed:false},
@@ -536,11 +537,12 @@ function confirmAction(title, body, onYes){
   `);
   document.getElementById("confirm-yes-btn").onclick = ()=>{ closeModal(); onYes(); };
 }
-function openModal(innerHtml){
+function openModal(innerHtml, opts){
+  opts = opts || {};
   const root = document.getElementById("modal-root");
   root.innerHTML = `<div class="overlay" id="ov"><div class="modal">${innerHtml}</div></div>`;
   const ov = document.getElementById("ov");
-  ov.addEventListener("click", (e)=>{ if(e.target.id==="ov") closeModal(); });
+  if(!opts.locked) ov.addEventListener("click", (e)=>{ if(e.target.id==="ov") closeModal(); });
   requestAnimationFrame(()=>ov.classList.add("open"));
   mountIcons();
 }
@@ -770,6 +772,21 @@ function renderHome(){
       </div>
     </div>
 
+    ${shouldNudgeBackup()? `
+    <div class="card" style="margin-top:18px; border-color:var(--clay); background:var(--clay-soft);">
+      <div style="display:flex; gap:12px; align-items:flex-start;">
+        <span style="color:var(--clay); flex-shrink:0; margin-top:1px;">${icon("download",18)}</span>
+        <div style="flex:1;">
+          <div style="font-weight:700; font-size:13.5px; margin-bottom:3px;">Back up your Daybook</div>
+          <div class="muted" style="font-size:12.5px; line-height:1.55;">Your entries live only on this device. A quick export means a cleared browser or a new phone can't take them with it.</div>
+          <div class="row" style="margin-top:11px;">
+            <button class="btn btn-soft" id="nudge-export">${icon("download",14)} Export now</button>
+            <button class="btn btn-ghost" id="nudge-dismiss">Later</button>
+          </div>
+        </div>
+      </div>
+    </div>`:""}
+
     ${showQuote ? quoteCardHtml() : ""}
 
     ${anyEnabled ? `
@@ -786,6 +803,8 @@ function renderHome(){
     </div>`}
   `;
   root.querySelectorAll("[data-route]").forEach(a=>a.onclick=(e)=>{e.preventDefault(); setRoute(a.dataset.route);});
+  const nudgeExp = document.getElementById("nudge-export"); if(nudgeExp) nudgeExp.onclick = ()=>{ exportData(); renderHome(); };
+  const nudgeDis = document.getElementById("nudge-dismiss"); if(nudgeDis) nudgeDis.onclick = ()=>{ state.settings.backupNudgeDismissedAt = Date.now(); save(); renderHome(); };
   const custBtn = document.getElementById("customize-dash-btn"); if(custBtn) custBtn.onclick = openDashboardCustomizeModal;
   const emptyCustBtn = document.getElementById("empty-customize-btn"); if(emptyCustBtn) emptyCustBtn.onclick = openDashboardCustomizeModal;
   const addTaskBtn = document.getElementById("add-task-btn"); if(addTaskBtn) addTaskBtn.onclick = ()=>openTaskModal();
@@ -1697,7 +1716,10 @@ function renderJournal(){
 
   root.innerHTML = `
     <div class="hero"><div><h1>Journal</h1><div class="sub">A free space to write about your day.</div></div>
-      ${state.settings.journalLockEnabled?`<button class="btn-icon" id="journal-relock-btn" title="Lock now">${icon("lock",16)}</button>`:""}
+      <div style="display:flex; gap:8px; align-items:center;">
+        <button class="btn btn-soft" id="journal-book-btn">${icon("book-open",15)} Export book</button>
+        ${state.settings.journalLockEnabled?`<button class="btn-icon" id="journal-relock-btn" title="Lock now">${icon("lock",16)}</button>`:""}
+      </div>
     </div>
     <div class="cols-2" style="margin-top:18px;">
       <div>${journalTodayCardHtml(today)}</div>
@@ -1711,6 +1733,8 @@ function renderJournal(){
   `;
   bindJournalTodayEvents(root, today);
   root.querySelectorAll("[data-open-journal]").forEach(el=> el.onclick = ()=> openJournalEntryModal(el.dataset.openJournal));
+  const bookBtn = document.getElementById("journal-book-btn");
+  if(bookBtn) bookBtn.onclick = openJournalBookModal;
   const relockBtn = document.getElementById("journal-relock-btn");
   if(relockBtn) relockBtn.onclick = ()=>{ ui.journalUnlocked=false; renderJournal(); };
   mountIcons();
@@ -2003,6 +2027,326 @@ function openJournalEntryModal(dateKey){
     confirmAction("Delete this entry?","This can't be undone.", ()=>{
       delete state.journal.entries[dateKey]; save(); closeModal(); rerenderCurrent();
     });
+  };
+}
+
+/* =========================================================
+   JOURNAL BOOK — export & share
+   Builds a single self-contained .html file: text, photos and
+   playable voice notes all embedded as data URIs, styled like
+   a printed book. Opens anywhere, works offline forever, and
+   prints straight to PDF from inside the file.
+   ========================================================= */
+const BOOK_RANGES = [
+  {id:"all", label:"Everything"},
+  {id:"365", label:"Past year"},
+  {id:"90", label:"Past 90 days"},
+  {id:"30", label:"Past 30 days"},
+];
+
+function journalEntriesInRange(rangeId){
+  const all = Object.keys(state.journal.entries||{}).filter(d=>{
+    const e = state.journal.entries[d] || {};
+    return (e.text||"").trim().length>0 || (e.images||[]).length>0 || (e.voiceNotes||[]).length>0;
+  });
+  let keys = all;
+  if(rangeId!=="all"){
+    const from = addDays(todayKey(), -parseInt(rangeId,10));
+    keys = all.filter(d=> d>=from);
+  }
+  return keys.sort();
+}
+function bookStats(keys){
+  let words=0, photos=0, voices=0;
+  keys.forEach(d=>{
+    const e = state.journal.entries[d]||{};
+    words += (e.text||"").trim().split(/\s+/).filter(Boolean).length;
+    photos += (e.images||[]).length;
+    voices += (e.voiceNotes||[]).length;
+  });
+  return {entries:keys.length, words, photos, voices};
+}
+function blobToDataUrl(blob){
+  return new Promise((resolve)=>{
+    const fr = new FileReader();
+    fr.onload = ()=>resolve(fr.result);
+    fr.onerror = ()=>resolve(null);
+    fr.readAsDataURL(blob);
+  });
+}
+/* Shrink photos before embedding, otherwise a year of pictures
+   makes a file nobody can email. */
+async function imageToDataUrl(blob, maxDim){
+  maxDim = maxDim || 1400;
+  try{
+    const bmp = await createImageBitmap(blob);
+    let {width:w, height:h} = bmp;
+    const scale = Math.min(1, maxDim/Math.max(w,h));
+    w = Math.round(w*scale); h = Math.round(h*scale);
+    const canvas = document.createElement("canvas");
+    canvas.width = w; canvas.height = h;
+    canvas.getContext("2d").drawImage(bmp, 0, 0, w, h);
+    bmp.close && bmp.close();
+    return canvas.toDataURL("image/jpeg", 0.82);
+  }catch(e){
+    return await blobToDataUrl(blob);
+  }
+}
+function esc(s){ return escapeHtml(s==null?"":s); }
+function bookDateParts(key){
+  const [y,m,d] = key.split("-").map(Number);
+  const dt = new Date(y, m-1, d);
+  return {weekday: dt.toLocaleDateString(undefined,{weekday:"long"}), day:d, month:MONTHS[m-1], year:y};
+}
+
+async function buildJournalBook(opts, onProgress){
+  const keys = journalEntriesInRange(opts.range);
+  const stats = bookStats(keys);
+  const total = (opts.photos?stats.photos:0) + (opts.voices?stats.voices:0);
+  let done = 0;
+  const tick = ()=>{ done++; if(onProgress) onProgress(done, total); };
+
+  const chapters = [];
+  for(const key of keys){
+    const e = state.journal.entries[key] || {};
+    const parts = bookDateParts(key);
+    const moodV = (state.mood.logs[key]||{}).value;
+    const mood = MOODS.find(m=>m.v===moodV);
+    const refl = opts.reflections ? (state.reflections[key]||{}) : {};
+
+    let imgs = [];
+    if(opts.photos){
+      for(const id of (e.images||[])){
+        const blob = await mediaGet(id);
+        if(blob){ const url = await imageToDataUrl(blob); if(url) imgs.push(url); }
+        tick();
+      }
+    }
+    let auds = [];
+    if(opts.voices){
+      for(const id of (e.voiceNotes||[])){
+        const blob = await mediaGet(id);
+        if(blob){ const url = await blobToDataUrl(blob); if(url) auds.push({url, type:blob.type||"audio/webm"}); }
+        tick();
+      }
+    }
+
+    const reflBits = ["wentWell","improve","grateful","feel","tomorrow"]
+      .map(k=>({k, v:(refl[k]||"").trim()}))
+      .filter(x=>x.v);
+    const reflLabels = {wentWell:"What went well", improve:"What could be better", grateful:"Grateful for", feel:"How I felt", tomorrow:"Tomorrow"};
+
+    chapters.push(`
+  <article class="entry">
+    <header class="entry-head">
+      <div class="entry-date"><span class="dnum">${parts.day}</span><span class="drest">${esc(parts.month)} ${parts.year}</span></div>
+      <div class="entry-meta"><span class="wd">${esc(parts.weekday)}</span>${mood?`<span class="mood">${mood.emoji} ${esc(mood.label)}</span>`:""}</div>
+    </header>
+    ${(e.text||"").trim()? `<div class="entry-body">${esc(e.text).replace(/\n{2,}/g,"</p><p>").replace(/\n/g,"<br/>").replace(/^/,"<p>")+"</p>"}</div>` : `<div class="entry-body muted-i">No written entry for this day.</div>`}
+    ${imgs.length? `<div class="plates ${imgs.length===1?"one":""}">${imgs.map(u=>`<figure><img src="${u}" alt=""/></figure>`).join("")}</div>`:""}
+    ${auds.length? `<div class="voices"><div class="vlabel">Voice ${auds.length>1?"notes":"note"}</div>${auds.map(a=>`<audio controls preload="none" src="${a.url}"></audio>`).join("")}</div>`:""}
+    ${reflBits.length? `<div class="reflect"><div class="rlabel">Reflection</div>${reflBits.map(x=>`<div class="rrow"><span class="rk">${esc(reflLabels[x.k])}</span><span class="rv">${esc(x.v)}</span></div>`).join("")}</div>`:""}
+  </article>`);
+  }
+
+  const first = keys[0], last = keys[keys.length-1];
+  const spanLabel = keys.length
+    ? (first===last ? fmtDateLong(first) : fmtDateLong(first)+" — "+fmtDateLong(last))
+    : "No entries yet";
+  const author = state.user.name || "Me";
+  const title = author + "'s Daybook";
+
+  const byMonth = {};
+  keys.forEach(k=>{ const p=bookDateParts(k); const key=p.month+" "+p.year; byMonth[key]=(byMonth[key]||0)+1; });
+  const contents = Object.keys(byMonth).map(m=>`<li><span>${esc(m)}</span><span class="dots"></span><span>${byMonth[m]} ${byMonth[m]===1?"entry":"entries"}</span></li>`).join("");
+
+  return `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>${esc(title)}</title>
+<style>
+  :root{ --paper:#FBF8F1; --ink:#23262B; --soft:#6B6F76; --faint:#A8A296; --rule:#E3DCCC; --accent:${state.user.accent||"#4F7A68"}; }
+  *{box-sizing:border-box;}
+  body{margin:0; background:#EDE8DD; color:var(--ink);
+    font-family:Georgia,'Iowan Old Style','Times New Roman',serif; line-height:1.7;
+    -webkit-font-smoothing:antialiased;}
+  .bar{position:sticky; top:0; z-index:9; display:flex; gap:10px; align-items:center; justify-content:space-between;
+    padding:10px 16px; background:rgba(35,38,43,.94); color:#fff; font-family:system-ui,sans-serif; font-size:13px;}
+  .bar button{font:inherit; font-weight:600; border:none; border-radius:8px; padding:8px 16px; cursor:pointer;
+    background:#fff; color:#23262B;}
+  .sheet{max-width:760px; margin:0 auto; background:var(--paper); padding:0 0 80px;
+    box-shadow:0 0 60px rgba(0,0,0,.10); min-height:100vh;}
+  .cover{padding:110px 64px 80px; text-align:center; border-bottom:1px solid var(--rule);}
+  .cover .mark{width:44px;height:44px;border-radius:12px;background:var(--accent); margin:0 auto 26px;}
+  .cover h1{font-size:44px; margin:0 0 10px; font-weight:600; letter-spacing:-.02em;}
+  .cover .span{color:var(--soft); font-size:15px; font-style:italic; margin-bottom:34px;}
+  .figures{display:flex; justify-content:center; gap:34px; flex-wrap:wrap;
+    font-family:system-ui,sans-serif; border-top:1px solid var(--rule); padding-top:26px;}
+  .figures div{min-width:70px;}
+  .figures b{display:block; font-size:23px; font-weight:600; font-family:Georgia,serif;}
+  .figures span{font-size:11px; text-transform:uppercase; letter-spacing:.09em; color:var(--faint);}
+  .toc{padding:48px 64px; border-bottom:1px solid var(--rule);}
+  .toc h2, .entry-body{font-size:16.5px;}
+  .toc h2{font-size:12px; text-transform:uppercase; letter-spacing:.13em; color:var(--faint);
+    font-family:system-ui,sans-serif; margin:0 0 18px;}
+  .toc ul{list-style:none; margin:0; padding:0;}
+  .toc li{display:flex; align-items:baseline; gap:10px; padding:5px 0; font-size:14.5px;}
+  .toc .dots{flex:1; border-bottom:1px dotted var(--rule); transform:translateY(-4px);}
+  .entry{padding:52px 64px; border-bottom:1px solid var(--rule);}
+  .entry:last-child{border-bottom:none;}
+  .entry-head{display:flex; align-items:flex-end; justify-content:space-between; gap:16px;
+    margin-bottom:22px; flex-wrap:wrap;}
+  .entry-date{display:flex; align-items:baseline; gap:11px;}
+  .dnum{font-size:42px; font-weight:600; line-height:1; letter-spacing:-.03em;}
+  .drest{font-size:15px; color:var(--soft);}
+  .entry-meta{display:flex; align-items:center; gap:12px; font-family:system-ui,sans-serif; font-size:12px;}
+  .wd{text-transform:uppercase; letter-spacing:.11em; color:var(--faint);}
+  .mood{background:#fff; border:1px solid var(--rule); border-radius:999px; padding:4px 11px;}
+  .entry-body p{margin:0 0 15px; white-space:pre-wrap;}
+  .muted-i{color:var(--faint); font-style:italic;}
+  .plates{display:grid; grid-template-columns:1fr 1fr; gap:12px; margin:26px 0 0;}
+  .plates.one{grid-template-columns:1fr;}
+  .plates figure{margin:0;}
+  .plates img{width:100%; display:block; border-radius:4px; border:1px solid var(--rule);}
+  .voices{margin-top:26px;}
+  .vlabel,.rlabel{font-family:system-ui,sans-serif; font-size:11px; text-transform:uppercase;
+    letter-spacing:.11em; color:var(--faint); margin-bottom:9px;}
+  .voices audio{width:100%; margin-bottom:9px;}
+  .reflect{margin-top:26px; padding:18px 20px; background:#fff; border:1px solid var(--rule); border-radius:6px;}
+  .rrow{display:flex; gap:14px; padding:6px 0; font-size:14px;}
+  .rk{flex:0 0 132px; color:var(--faint); font-family:system-ui,sans-serif; font-size:11.5px;
+    text-transform:uppercase; letter-spacing:.06em; padding-top:3px;}
+  .rv{flex:1;}
+  .colophon{padding:44px 64px; text-align:center; color:var(--faint);
+    font-family:system-ui,sans-serif; font-size:11.5px; line-height:1.8;}
+  @media(max-width:640px){
+    .cover{padding:70px 26px 50px;} .cover h1{font-size:32px;}
+    .toc,.entry,.colophon{padding-left:26px; padding-right:26px;}
+    .plates{grid-template-columns:1fr;} .dnum{font-size:34px;}
+    .rrow{flex-direction:column; gap:2px;} .rk{flex:none;}
+  }
+  @media print{
+    body{background:#fff;} .bar{display:none;}
+    .sheet{box-shadow:none; max-width:none; background:transparent; padding-bottom:0;}
+    .cover{page-break-after:always; padding:120px 0 0; border-bottom:none;}
+    .toc{page-break-after:always; padding:0; border-bottom:none;}
+    .entry{page-break-inside:avoid; border-bottom:none; padding:0 0 34px;}
+    .colophon{padding:34px 0 0; border-top:1px solid var(--rule);}
+    .voices{display:none;}
+    .plates img{border-color:#D8D2C4;}
+    a{color:inherit; text-decoration:none;}
+    @page{margin:18mm;}
+  }
+</style>
+</head><body>
+<div class="bar">
+  <span>${esc(title)} · ${stats.entries} ${stats.entries===1?"entry":"entries"}</span>
+  <button onclick="window.print()">Print or save as PDF</button>
+</div>
+<div class="sheet">
+  <div class="cover">
+    <div class="mark"></div>
+    <h1>${esc(title)}</h1>
+    <div class="span">${esc(spanLabel)}</div>
+    <div class="figures">
+      <div><b>${stats.entries}</b><span>Entries</span></div>
+      <div><b>${stats.words.toLocaleString()}</b><span>Words</span></div>
+      ${opts.photos&&stats.photos?`<div><b>${stats.photos}</b><span>Photos</span></div>`:""}
+      ${opts.voices&&stats.voices?`<div><b>${stats.voices}</b><span>Voice notes</span></div>`:""}
+    </div>
+  </div>
+  ${contents? `<div class="toc"><h2>Contents</h2><ul>${contents}</ul></div>`:""}
+  ${chapters.join("\n") || `<div class="entry"><div class="muted-i">Nothing written in this period yet.</div></div>`}
+  <div class="colophon">
+    Exported from Daybook on ${esc(fmtDateLong(todayKey()))}.<br/>
+    This file holds everything inside it — photos and voice notes included — so it keeps working offline, forever, with no app required.
+    ${(opts.voices&&stats.voices)?"<br/>Voice notes play in a browser; they are left out when printing to PDF.":""}
+  </div>
+</div>
+</body></html>`;
+}
+
+function openJournalBookModal(){
+  const defaults = {range:"all", photos:true, voices:true, reflections:true};
+  const preview = ()=>{
+    const r = document.querySelector("[data-bk-range].active");
+    const rid = r? r.dataset.bkRange : "all";
+    const keys = journalEntriesInRange(rid);
+    const s = bookStats(keys);
+    const el = document.getElementById("bk-summary");
+    if(el) el.textContent = s.entries
+      ? `${s.entries} ${s.entries===1?"entry":"entries"} · ${s.words.toLocaleString()} words · ${s.photos} photo${s.photos===1?"":"s"} · ${s.voices} voice note${s.voices===1?"":"s"}`
+      : "No entries in this period.";
+  };
+  openModal(`
+    <div class="modal-head"><h3>Make a journal book</h3><button class="icon-btn-plain" onclick="__closeModal()">${icon("x",20)}</button></div>
+    <p class="muted" style="font-size:12.5px; margin-top:-8px; margin-bottom:16px;">
+      One file with your writing, photos and voice notes inside it. Open it in any browser, share it like any file, or print it to PDF.
+    </p>
+    <div class="field"><label class="field-label">Include</label>
+      <div class="chip-row">${BOOK_RANGES.map(r=>`<button class="chip ${r.id===defaults.range?'on active':''}" data-bk-range="${r.id}">${r.label}</button>`).join("")}</div>
+      <div class="muted mono" id="bk-summary" style="font-size:11.5px; margin-top:10px;"></div>
+    </div>
+    <div class="linkline"><span style="font-size:13.5px;">Photos</span><label class="switch"><input type="checkbox" id="bk-photos" checked/><span class="slider"></span></label></div>
+    <div class="linkline"><span style="font-size:13.5px;">Voice notes</span><label class="switch"><input type="checkbox" id="bk-voices" checked/><span class="slider"></span></label></div>
+    <div class="linkline"><span style="font-size:13.5px;">Daily reflections &amp; mood</span><label class="switch"><input type="checkbox" id="bk-refl" checked/><span class="slider"></span></label></div>
+    <p class="muted" style="font-size:11.5px; margin:12px 0 0;">Photos are resized on the way in so the file stays small enough to send. Leaving voice notes out makes it much smaller again.</p>
+    <div id="bk-progress" class="muted mono" style="font-size:12px; margin-top:14px; display:none;"></div>
+    <button class="btn btn-primary" id="bk-make" style="width:100%; margin-top:16px;">${icon("book-open",15)} Create book</button>
+  `);
+  document.getElementById("modal-root").querySelectorAll("[data-bk-range]").forEach(b=> b.onclick = ()=>{
+    document.querySelectorAll("[data-bk-range]").forEach(x=>x.classList.remove("on","active"));
+    b.classList.add("on","active"); preview();
+  });
+  preview();
+
+  document.getElementById("bk-make").onclick = async ()=>{
+    const btn = document.getElementById("bk-make");
+    const prog = document.getElementById("bk-progress");
+    const opts = {
+      range: (document.querySelector("[data-bk-range].active")||{dataset:{bkRange:"all"}}).dataset.bkRange,
+      photos: document.getElementById("bk-photos").checked,
+      voices: document.getElementById("bk-voices").checked,
+      reflections: document.getElementById("bk-refl").checked,
+    };
+    if(!journalEntriesInRange(opts.range).length){ toast("Nothing to put in the book yet"); return; }
+    btn.disabled = true; btn.textContent = "Building...";
+    prog.style.display = "block"; prog.textContent = "Gathering entries...";
+    try{
+      const html = await buildJournalBook(opts, (d,t)=>{ prog.textContent = t? `Embedding media ${d} of ${t}...` : "Laying out pages..."; });
+      const blob = new Blob([html], {type:"text/html"});
+      const name = "daybook-journal-"+todayKey()+".html";
+      prog.textContent = "Ready — "+fmtBytes(blob.size);
+      const file = (window.File)? new File([blob], name, {type:"text/html"}) : null;
+      const canShare = file && navigator.canShare && navigator.canShare({files:[file]});
+      btn.disabled = false;
+      btn.innerHTML = `${icon("download",15)} Save book (${fmtBytes(blob.size)})`;
+      mountIcons();
+      btn.onclick = ()=>{
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url; a.download = name;
+        document.body.appendChild(a); a.click(); a.remove();
+        setTimeout(()=>URL.revokeObjectURL(url), 4000);
+        toast("Journal book saved","book-open");
+      };
+      if(canShare){
+        const share = document.createElement("button");
+        share.className = "btn btn-ghost";
+        share.style.cssText = "width:100%; margin-top:10px;";
+        share.innerHTML = `${icon("share-2",15)} Share book`;
+        share.onclick = ()=>{ navigator.share({files:[file], title:"My Daybook journal"}).catch(()=>{}); };
+        btn.parentNode.insertBefore(share, btn.nextSibling);
+        mountIcons();
+      }
+    }catch(e){
+      console.warn(e);
+      prog.textContent = "";
+      btn.disabled = false; btn.innerHTML = `${icon("book-open",15)} Try again`;
+      mountIcons();
+      toast("Couldn't build the book");
+    }
   };
 }
 
@@ -2956,6 +3300,43 @@ function renderSettings(){
       <div class="muted" style="font-size:12.5px;">${state.favoriteQuotes.length} favorited quote(s)</div>
     </div>
 
+    <div class="section-title"><h2>Your Data &amp; Storage</h2></div>
+    <div class="card">
+      <div style="display:flex; gap:10px; align-items:flex-start; margin-bottom:14px;">
+        ${icon("hard-drive",17)}
+        <div style="font-size:13px; line-height:1.6; color:var(--ink-soft);">
+          Everything you write lives in <strong style="color:var(--ink);">this browser on this device</strong>. It is never uploaded, so it does not sync to your other devices — and clearing your browsing data will erase it.
+        </div>
+      </div>
+      <div class="linkline">
+        <span style="font-size:13.5px;">Space used</span>
+        <span class="mono muted" id="st-storage-usage" style="font-size:12.5px;">checking...</span>
+      </div>
+      <div class="linkline">
+        <span style="font-size:13.5px;">Protected from auto-cleanup</span>
+        <span id="st-persist-slot" class="muted" style="font-size:12.5px;">checking...</span>
+      </div>
+      <div class="linkline">
+        <span style="font-size:13.5px;">Last backup</span>
+        <span class="muted" style="font-size:12.5px;">${s.lastExportAt? fmtDateLong(todayKey(new Date(s.lastExportAt))) : "never"}</span>
+      </div>
+      <p class="muted" style="font-size:11.5px; margin:12px 0 0;">Browsers can clear storage when a device runs low on space. Asking for protection makes that far less likely — and on iPhone it stops Safari discarding your data after a week of not opening the app.</p>
+    </div>
+
+    <div class="section-title"><h2>Permissions</h2></div>
+    <div class="card">
+      <p class="muted" style="font-size:12.5px; margin:0 0 14px;">All optional. Daybook works fully without any of them, and asks only at the moment a feature needs one.</p>
+      ${PERMISSIONS.map(p=>`
+        <div style="display:flex; gap:11px; align-items:flex-start; padding:11px 2px; border-bottom:1px solid var(--border);">
+          <span style="color:var(--ink-soft); flex-shrink:0; margin-top:1px;">${icon(p.icon,16)}</span>
+          <div>
+            <div style="font-weight:600; font-size:13.5px;">${p.name}</div>
+            <div class="muted" style="font-size:12px; line-height:1.55; margin-top:2px;">${p.why}</div>
+          </div>
+        </div>`).join("")}
+      <p class="muted" style="font-size:11.5px; margin:14px 0 0;">You can withdraw any of these at any time from your browser's site settings.</p>
+    </div>
+
     <div class="section-title"><h2>Data</h2></div>
     <div class="card">
       <div class="row" style="margin-bottom:10px;">
@@ -2963,7 +3344,26 @@ function renderSettings(){
         <button class="btn btn-ghost" id="data-import-btn">${icon("upload",15)} Import JSON</button>
         <input type="file" id="data-import-file" accept="application/json" style="display:none;"/>
       </div>
+      <button class="btn btn-ghost" id="data-book" style="width:100%; margin-bottom:10px;">${icon("book-open",15)} Export Journal as a book</button>
       <button class="btn btn-danger" id="data-reset" style="width:100%;">${icon("refresh-ccw",15)} Reset All Data</button>
+      <p class="muted" style="font-size:11.5px; margin:10px 0 0;">Reset erases everything permanently and cannot be undone. Export a backup first.</p>
+    </div>
+
+    <div class="section-title"><h2>About &amp; Legal</h2></div>
+    <div class="card">
+      <button class="linkline" data-legal="terms" style="width:100%;background:none;border:none;cursor:pointer;color:var(--ink);text-align:left;">
+        <span style="display:flex;align-items:center;gap:10px;font-weight:600;font-size:13.5px;">${icon("file-text",16)} Terms of Use</span>${icon("chevron-right",16)}
+      </button>
+      <button class="linkline" data-legal="privacy" style="width:100%;background:none;border:none;cursor:pointer;color:var(--ink);text-align:left;">
+        <span style="display:flex;align-items:center;gap:10px;font-weight:600;font-size:13.5px;">${icon("shield",16)} Privacy Policy</span>${icon("chevron-right",16)}
+      </button>
+      <button class="linkline" data-legal="health" style="width:100%;background:none;border:none;cursor:pointer;color:var(--ink);text-align:left;">
+        <span style="display:flex;align-items:center;gap:10px;font-weight:600;font-size:13.5px;">${icon("stethoscope",16)} Health &amp; Medical Disclaimer</span>${icon("chevron-right",16)}
+      </button>
+      <div class="linkline"><span style="font-size:13.5px;">Version</span><span class="mono muted" style="font-size:12.5px;">${APP_VERSION}</span></div>
+      <div class="linkline"><span style="font-size:13.5px;">Terms accepted</span><span class="muted" style="font-size:12.5px;">${s.legalAcceptedAt? fmtDateLong(todayKey(new Date(s.legalAcceptedAt))) : "not yet"}</span></div>
+      <div class="linkline"><span style="font-size:13.5px;">Contact</span><a href="mailto:${CONTACT_EMAIL}" style="font-size:12.5px; color:var(--accent); font-weight:600;">${CONTACT_EMAIL}</a></div>
+      <div class="linkline"><span style="font-size:13.5px;">Source code</span><a href="${REPO_URL}" target="_blank" rel="noopener" style="font-size:12.5px; color:var(--accent); font-weight:600;">GitHub</a></div>
     </div>
   `;
   document.getElementById("st-name").onchange = e=>{ u.name=e.target.value.trim()||"Friend"; save(); renderShell(); };
@@ -3043,6 +3443,32 @@ function renderSettings(){
   document.getElementById("nt-testnotif").onclick = ()=> requestNotifPermissionThenTest();
   document.getElementById("nt-enable").onclick = ()=>{ requestNotifPermissionThenTest(); setTimeout(renderSettings, 400); };
   document.getElementById("st-quotepref").onchange = e=>{ s.quotePref=e.target.value; save(); };
+  bindLegalLinks(root);
+  const persistSlot = document.getElementById("st-persist-slot");
+  storageEstimate().then(est=>{
+    const el = document.getElementById("st-storage-usage");
+    if(el) el.textContent = est ? fmtBytes(est.usage) : "not reported";
+  });
+  checkStoragePersisted().then(ok=>{
+    if(!persistSlot) return;
+    if(ok){ persistSlot.innerHTML = `<span style="color:var(--accent); font-weight:600;">Protected \u2713</span>`; }
+    else if(navigator.storage && navigator.storage.persist){
+      persistSlot.innerHTML = `<button class="btn btn-soft" id="st-persist-btn" style="padding:6px 12px; font-size:12.5px;">Turn on</button>`;
+      document.getElementById("st-persist-btn").onclick = async ()=>{
+        const granted = await requestPersistentStorage();
+        toast(granted? "Your data is now protected" : "Your browser declined \u2014 data is still saved, just not protected", granted?"shield-check":"info");
+        renderSettings();
+      };
+    } else { persistSlot.textContent = "not supported here"; }
+  });
+  document.getElementById("data-book").onclick = ()=>{
+    // never let the Settings shortcut walk around the journal lock
+    const hasCred = state.settings.journalPinHash || state.settings.journalWebAuthnCredId;
+    if(state.settings.journalLockEnabled && hasCred && !ui.journalUnlocked){
+      toast("Unlock your journal first","lock"); setRoute("journal"); return;
+    }
+    openJournalBookModal();
+  };
   document.getElementById("data-export").onclick = exportData;
   document.getElementById("data-import-btn").onclick = ()=> document.getElementById("data-import-file").click();
   document.getElementById("data-import-file").onchange = importData;
@@ -3054,6 +3480,208 @@ function renderSettings(){
   mountIcons();
 }
 
+/* =========================================================
+   STORAGE, PERMISSIONS & LEGAL
+   ========================================================= */
+const APP_VERSION = "1.2.0";
+const LEGAL_VERSION = "2026-09-01";
+const LEGAL_UPDATED = "1 September 2026";
+const CONTACT_EMAIL = "contact.gauravhq@gmail.com";
+const REPO_URL = "https://github.com/GauravvDev/Daybook-app-";
+
+/* ---------- storage ---------- */
+let storagePersisted = false;
+async function checkStoragePersisted(){
+  try{
+    if(navigator.storage && navigator.storage.persisted){
+      storagePersisted = await navigator.storage.persisted();
+    }
+  }catch(e){}
+  return storagePersisted;
+}
+async function requestPersistentStorage(){
+  try{
+    if(!navigator.storage || !navigator.storage.persist) return false;
+    const ok = await navigator.storage.persist();
+    storagePersisted = ok;
+    return ok;
+  }catch(e){ return false; }
+}
+async function storageEstimate(){
+  try{
+    if(navigator.storage && navigator.storage.estimate){
+      const e = await navigator.storage.estimate();
+      return {usage:e.usage||0, quota:e.quota||0};
+    }
+  }catch(e){}
+  return null;
+}
+function fmtBytes(n){
+  if(!n) return "0 KB";
+  if(n < 1024*1024) return (n/1024).toFixed(0)+" KB";
+  return (n/1024/1024).toFixed(1)+" MB";
+}
+function daysSinceExport(){
+  if(!state.settings.lastExportAt) return null;
+  return Math.floor((Date.now()-state.settings.lastExportAt)/86400000);
+}
+function hasMeaningfulData(){
+  return state.tasks.length>3 || Object.keys(state.journal.entries||{}).length>1
+      || Object.keys(state.habitLogs||{}).length>2 || (state.cycle && state.cycle.periods.length>0);
+}
+function shouldNudgeBackup(){
+  if(!hasMeaningfulData()) return false;
+  const dismissed = state.settings.backupNudgeDismissedAt;
+  if(dismissed && (Date.now()-dismissed) < 14*86400000) return false;
+  const d = daysSinceExport();
+  return d===null || d>=30;
+}
+
+/* ---------- permissions summary ---------- */
+const PERMISSIONS = [
+  {icon:"bell", name:"Notifications", why:"Only used to send the reminders you switch on — tasks, medicines, focus sessions and cycle predictions. Asked for the first time you enable a reminder."},
+  {icon:"mic", name:"Microphone", why:"Only used while you are recording a voice note in the Journal. Recording stops the moment you tap stop, and the audio is saved on this device."},
+  {icon:"hard-drive", name:"Persistent storage", why:"Asks your browser not to auto-delete Daybook's data when the device is low on space. Strongly recommended, since your data lives only on this device."},
+  {icon:"fingerprint", name:"Device unlock (Face ID / fingerprint)", why:"Optional, only if you lock your Journal. Your browser performs the check — Daybook never receives your biometric data."},
+];
+
+/* ---------- legal documents ---------- */
+function legalDocHtml(id){
+  const P = (t)=>`<p style="font-size:13.5px; line-height:1.65; color:var(--ink-soft); margin:0 0 12px;">${t}</p>`;
+  const H = (t)=>`<div style="font-weight:700; font-size:13.5px; margin:18px 0 8px; color:var(--ink);">${t}</div>`;
+  const UL = (items)=>`<ul style="font-size:13.5px; line-height:1.65; color:var(--ink-soft); margin:0 0 12px; padding-left:20px;">${items.map(i=>`<li style="margin-bottom:5px;">${i}</li>`).join("")}</ul>`;
+  const STAMP = `<div class="muted" style="font-size:11.5px; margin-bottom:16px;">Last updated ${LEGAL_UPDATED} · Version ${LEGAL_VERSION}</div>`;
+
+  if(id==="privacy"){
+    return STAMP
+    + P("Short version: Daybook has no account system, no server and no analytics. Everything you type stays in your own browser. Nobody, including the developer, can read it.")
+    + H("What Daybook stores, and where")
+    + P("All of your entries — tasks, habits, goals, focus sessions, journal text, mood, health logs and cycle data — are written to <strong>localStorage</strong> in the browser you are using right now. Journal photos and voice notes are stored in <strong>IndexedDB</strong> on the same device. None of it is transmitted anywhere.")
+    + P("Because the data is tied to one browser on one device, it does not sync between your phone and your computer, and it is erased if you clear your browsing data, use a private window, or uninstall the app.")
+    + H("What is never collected")
+    + UL(["No account, email address, name or phone number is sent anywhere. The name you enter is only shown back to you.",
+          "No analytics, telemetry, crash reporting or usage tracking.",
+          "No advertising, no advertising identifiers, no cookies used for tracking.",
+          "No selling or sharing of data with third parties, because no data reaches the developer in the first place."])
+    + H("Third parties that see a network request")
+    + P("Daybook is a web page, so loading it involves ordinary web requests. These parties can see your IP address and that you requested a file, but never your entries:")
+    + UL(["<strong>GitHub Pages</strong> — hosts the app files.",
+          "<strong>Google Fonts</strong> (fonts.googleapis.com, fonts.gstatic.com) — supplies the typefaces.",
+          "<strong>unpkg / cdnjs</strong> — supplies the icon library."])
+    + P("Once loaded, the app works fully offline and makes no further requests.")
+    + H("Sensitive categories")
+    + P("Daybook lets you record health-related information, including mood, sleep, medicines and — if you turn it on — menstrual cycle data. This is treated exactly like every other entry: written to your device only, never uploaded, never analysed by anyone but you. Cycle tracking is off by default and can be switched off at any time in Settings.")
+    + H("Your control over the data")
+    + UL(["<strong>Export</strong> — Settings → Data → Export JSON gives you a complete copy of everything.",
+          "<strong>Delete</strong> — Settings → Data → Reset All Data erases it permanently. Clearing your browser's site data for this address does the same.",
+          "There is nothing to request from the developer, because the developer holds nothing."])
+    + H("Children")
+    + P("Daybook is not directed at children under 13, and no data is knowingly collected from them.")
+    + H("Changes")
+    + P("If this policy changes materially you will be asked to review it the next time you open the app.")
+    + H("Contact")
+    + P(`Questions about privacy: <a href="mailto:${CONTACT_EMAIL}" style="color:var(--accent); font-weight:600;">${CONTACT_EMAIL}</a>`);
+  }
+
+  if(id==="terms"){
+    return STAMP
+    + P("By using Daybook you agree to these terms. If you do not agree, please stop using the app.")
+    + H("What Daybook is")
+    + P("Daybook is a free, offline-first personal tracking app for tasks, habits, goals, focus time, journalling, general wellbeing and — optionally — menstrual cycles. It is provided as-is, at no cost, with no account and no subscription.")
+    + H("Your data is your responsibility")
+    + P("Daybook stores everything on your device and keeps no backup. You are responsible for exporting your own copies. The developer cannot recover data that is lost because a browser cleared its storage, a device was reset or replaced, or an entry was deleted.")
+    + P("Use <strong>Settings → Data → Export JSON</strong> regularly if your entries matter to you.")
+    + H("Acceptable use")
+    + UL(["Use Daybook for your own personal tracking.",
+          "Do not use it to store other people's personal information without their knowledge.",
+          "Do not use it for anything unlawful."])
+    + H("No warranty")
+    + P("Daybook is provided “as is” and “as available”, without warranties of any kind, express or implied, including fitness for a particular purpose. Reminders depend on your browser and operating system and may not fire — do not rely on them for anything critical such as medication timing.")
+    + H("Limitation of liability")
+    + P("To the maximum extent permitted by law, the developer is not liable for any loss of data, missed reminder, or any indirect or consequential loss arising from your use of Daybook.")
+    + H("Open source")
+    + P(`Daybook's source code is published under the MIT Licence at <a href="${REPO_URL}" target="_blank" rel="noopener" style="color:var(--accent); font-weight:600;">github.com/GauravvDev/Daybook-app-</a>. The MIT Licence governs the code; these terms govern your use of the hosted app.`)
+    + H("Changes and governing law")
+    + P("These terms may be updated; you will be asked to review material changes in-app. They are governed by the laws of India.")
+    + H("Contact")
+    + P(`<a href="mailto:${CONTACT_EMAIL}" style="color:var(--accent); font-weight:600;">${CONTACT_EMAIL}</a>`);
+  }
+
+  /* health */
+  return STAMP
+  + P("<strong>Daybook is not a medical device and does not provide medical advice.</strong>")
+  + H("General health tracking")
+  + P("Water, sleep, mood, workout and medicine entries are a personal diary. Daybook does not diagnose anything, does not check your entries for safety, and its reminders are a convenience, not a clinical alert system. Never rely on a Daybook reminder for medication or treatment timing.")
+  + H("Menstrual cycle predictions")
+  + P("Predicted period dates, fertile windows and ovulation days are simple arithmetic based on the averages of what you have logged. They are estimates only.")
+  + UL(["<strong>Not contraception.</strong> Do not use the fertile window to plan or avoid pregnancy.",
+        "<strong>Not a fertility or pregnancy test.</strong>",
+        "Predictions are unreliable for irregular cycles, and for anyone recently pregnant, breastfeeding, approaching menopause, or using hormonal contraception.",
+        "A missed, unusually heavy, unusually painful or otherwise unexpected period is a reason to speak to a clinician, not to trust an estimate in an app."])
+  + H("If something feels wrong")
+  + P("Talk to a qualified healthcare professional. Do not delay seeking advice because of anything you read in this app. In an emergency, contact your local emergency services.")
+  + H("Contact")
+  + P(`<a href="mailto:${CONTACT_EMAIL}" style="color:var(--accent); font-weight:600;">${CONTACT_EMAIL}</a>`);
+}
+const LEGAL_TITLES = {terms:"Terms of Use", privacy:"Privacy Policy", health:"Health &amp; Medical Disclaimer"};
+/* Opens in its own overlay layer so it can sit ON TOP of the onboarding
+   or consent modal without destroying it. */
+function openLegalModal(id){
+  let root = document.getElementById("legal-root");
+  if(!root){ root = document.createElement("div"); root.id = "legal-root"; document.body.appendChild(root); }
+  root.innerHTML = `<div class="overlay" id="legal-ov" style="z-index:140;"><div class="modal">
+    <div class="modal-head"><h3>${LEGAL_TITLES[id]}</h3><button class="icon-btn-plain" data-legal-close>${icon("x",20)}</button></div>
+    <div style="max-height:58vh; overflow-y:auto; padding-right:4px;">${legalDocHtml(id)}</div>
+    <button class="btn btn-primary" style="width:100%; margin-top:16px;" data-legal-close>Close</button>
+  </div></div>`;
+  const ov = document.getElementById("legal-ov");
+  ov.addEventListener("click", (e)=>{ if(e.target.id==="legal-ov") closeLegalModal(); });
+  root.querySelectorAll("[data-legal-close]").forEach(b=> b.onclick = closeLegalModal);
+  requestAnimationFrame(()=>ov.classList.add("open"));
+  mountIcons();
+}
+function closeLegalModal(){
+  const ov = document.getElementById("legal-ov");
+  if(!ov) return;
+  ov.classList.remove("open");
+  setTimeout(()=>{ const r = document.getElementById("legal-root"); if(r) r.innerHTML = ""; }, 200);
+}
+function legalLinksHtml(){
+  return `<a href="#" data-legal="terms" style="color:var(--accent); font-weight:600;">Terms of Use</a>, the <a href="#" data-legal="privacy" style="color:var(--accent); font-weight:600;">Privacy Policy</a> and the <a href="#" data-legal="health" style="color:var(--accent); font-weight:600;">Health Disclaimer</a>`;
+}
+function bindLegalLinks(root){
+  (root||document).querySelectorAll("[data-legal]").forEach(a=> a.onclick = (e)=>{ e.preventDefault(); openLegalModal(a.dataset.legal); });
+}
+function acceptLegal(){
+  state.settings.legalAcceptedVersion = LEGAL_VERSION;
+  state.settings.legalAcceptedAt = Date.now();
+  save();
+}
+function legalAccepted(){ return state.settings.legalAcceptedVersion === LEGAL_VERSION; }
+
+/* shown to returning users when the terms change */
+function openLegalConsentModal(){
+  openModal(`
+    <div class="modal-head"><h3>Before you continue</h3></div>
+    <p class="muted" style="font-size:13.5px; line-height:1.6; margin-top:-8px;">
+      Daybook now has published terms, a privacy policy and a health disclaimer. Nothing about how your data is handled has changed — it still never leaves this device — but please have a look and confirm.
+    </p>
+    <div class="card" style="background:var(--bg-soft); box-shadow:none; padding:14px; margin-bottom:16px;">
+      <div style="display:flex; gap:10px; align-items:flex-start;">
+        <input type="checkbox" id="lc-agree" style="width:18px;height:18px;margin-top:2px;flex-shrink:0;"/>
+        <label for="lc-agree" style="font-size:13px; line-height:1.55; cursor:pointer;">
+          I have read and agree to the ${legalLinksHtml()}. I understand my data is stored only on this device and that Daybook does not provide medical advice.
+        </label>
+      </div>
+    </div>
+    <button class="btn btn-primary" id="lc-continue" style="width:100%;" disabled>Agree and continue</button>
+  `, {locked:true});
+  bindLegalLinks(document.getElementById("modal-root"));
+  const cb = document.getElementById("lc-agree"), btn = document.getElementById("lc-continue");
+  cb.onchange = ()=>{ btn.disabled = !cb.checked; };
+  btn.onclick = ()=>{ acceptLegal(); closeModal(); rerenderCurrent(); };
+}
+
 /* ---------------- data export/import ---------------- */
 function exportData(){
   const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
@@ -3062,7 +3690,9 @@ function exportData(){
   a.href = url; a.download = "daybook-export-"+todayKey()+".json";
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
-  toast("Data exported","download");
+  state.settings.lastExportAt = Date.now(); save();
+  toast("Backup saved to your downloads","download");
+  if(ui.route==="settings") renderSettings();
 }
 function importData(e){
   const file = e.target.files[0]; if(!file) return;
@@ -3187,9 +3817,18 @@ function openOnboardingModal(){
     <div class="field"><label class="field-label">First task for today (optional)</label><input type="text" id="ob-task" placeholder="e.g. Plan the week"/></div>
     <div class="field"><label class="field-label">A medicine/supplement to track (optional)</label><input type="text" id="ob-med" placeholder="e.g. Vitamin D"/></div>
 
+    <div class="card" style="background:var(--bg-soft); box-shadow:none; padding:14px; margin:18px 0 14px;">
+      <div style="display:flex; gap:10px; align-items:flex-start;">
+        <input type="checkbox" id="ob-agree" style="width:18px;height:18px;margin-top:2px;flex-shrink:0;"/>
+        <label for="ob-agree" style="font-size:12.5px; line-height:1.55; cursor:pointer;">
+          I have read and agree to the ${legalLinksHtml()}. I understand that Daybook stores everything on this device only, keeps no backup of its own, and does not provide medical advice.
+        </label>
+      </div>
+    </div>
+
     <div class="row" style="margin-top:8px;">
-      <button class="btn btn-ghost" id="ob-skip">Skip for now</button>
-      <button class="btn btn-primary" id="ob-done" style="flex:2;">${icon("check",15)} Get Started</button>
+      <button class="btn btn-ghost" id="ob-skip" disabled>Skip for now</button>
+      <button class="btn btn-primary" id="ob-done" style="flex:2;" disabled>${icon("check",15)} Get Started</button>
     </div>
   `);
   let selectedAvatar = state.user.avatarEmoji || "🌿";
@@ -3199,6 +3838,12 @@ function openOnboardingModal(){
     document.querySelectorAll("[data-ob-avatar]").forEach(x=>x.style.cssText="font-size:17px;");
     b.style.cssText = "font-size:17px;background:var(--accent-soft);border-color:var(--accent);";
   });
+  bindLegalLinks(document.getElementById("modal-root"));
+  const agreeBox = document.getElementById("ob-agree");
+  agreeBox.onchange = ()=>{
+    document.getElementById("ob-done").disabled = !agreeBox.checked;
+    document.getElementById("ob-skip").disabled = !agreeBox.checked;
+  };
   let selectedGender = state.user.gender || null;
   let cycleTouched = false;
   const obCycle = document.getElementById("ob-cycle");
@@ -3214,7 +3859,7 @@ function openOnboardingModal(){
     if(idx>=0){ selectedHabits.splice(idx,1); b.style.cssText="width:auto;padding:0 12px;gap:6px;display:inline-flex;align-items:center;"; }
     else{ selectedHabits.push(name); b.style.cssText="width:auto;padding:0 12px;gap:6px;display:inline-flex;align-items:center;background:var(--accent-soft);color:var(--accent);border-color:var(--accent);"; }
   });
-  const finish = ()=>{ state.onboarded = true; save(); closeModal(); rerenderCurrent(); renderShell(); };
+  const finish = ()=>{ state.onboarded = true; acceptLegal(); save(); closeModal(); rerenderCurrent(); renderShell(); requestPersistentStorage(); };
   document.getElementById("ob-skip").onclick = finish;
   document.getElementById("ob-done").onclick = ()=>{
     const name = document.getElementById("ob-name").value.trim();
@@ -3242,6 +3887,8 @@ function init(){
   applyTheme();
   render();
   if(!state.onboarded){ setTimeout(openOnboardingModal, 350); }
+  else if(!legalAccepted()){ setTimeout(openLegalConsentModal, 350); }
+  checkStoragePersisted();
   // Sync pomodoro remaining with settings on first load
   ui.pomodoro.remaining = state.settings.pomodoroFocusMin*60;
   // register service worker gracefully
