@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "io.github.gauravvdev.daybook",
+      "sha256_cert_fingerprints": [
+        "3E:95:86:12:54:4B:46:B3:DC:B7:E1:F8:10:46:CE:EF:CC:2D:69:1B:12:1C:FF:EF:19:A9:B9:5C:7D:0D:EC:B4"
+      ]
+    }
+  }
+]
