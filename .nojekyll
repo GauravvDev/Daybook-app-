@@ -1,0 +1,3 @@
+# Serve files as-is. Without this, GitHub Pages runs Jekyll, which hides
+# folders beginning with a dot - including .well-known/assetlinks.json,
+# the file that proves this site owns the Android app.
