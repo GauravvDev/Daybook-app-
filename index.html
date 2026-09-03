@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<title>Daybook — Track your day. Understand yourself.</title>
+<title>My Day Buddy — Track your day. Understand yourself.</title>
 <meta name="description" content="A calm personal command center for tasks, habits, health and reflection." />
 <meta name="theme-color" content="#4F7A68" />
 <link rel="manifest" href="manifest.json" />
@@ -14,7 +14,7 @@
 <link rel="apple-touch-icon" sizes="180x180" href="apple-touch-icon.png" />
 <meta name="mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-capable" content="yes" />
-<meta name="apple-mobile-web-app-title" content="Daybook" />
+<meta name="apple-mobile-web-app-title" content="My Day Buddy" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -68,7 +68,8 @@ a{color:inherit;}
   padding:24px 16px; display:flex; flex-direction:column; gap:3px; position:sticky; top:0; height:100vh; overflow-y:auto;
 }
 .brand{display:flex; align-items:center; gap:10px; padding:6px 10px 22px;}
-.brand-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(155deg,var(--accent),var(--clay)); display:flex;align-items:center;justify-content:center;color:var(--accent-ink);flex-shrink:0;}
+.brand-mark{width:34px;height:34px;border-radius:10px;background:#141513; display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;}
+.brand-mark svg{display:block;}
 .brand-name{font-family:'Fraunces',serif; font-weight:600; font-size:19px;}
 .nav-item{
   display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:12px; cursor:pointer;
@@ -277,7 +278,7 @@ hr.hair{border:none;border-top:1px solid var(--border); margin:14px 0;}
   <aside id="sidebar">
     <div class="brand">
       <div class="brand-mark" id="brand-mark-icon"></div>
-      <div class="brand-name">Daybook</div>
+      <div class="brand-name">My Day Buddy</div>
     </div>
     <nav id="nav-list"></nav>
     <div class="sidebar-foot">
@@ -292,7 +293,7 @@ hr.hair{border:none;border-top:1px solid var(--border); margin:14px 0;}
     <div id="topbar">
       <div style="display:flex;align-items:center;gap:9px;">
         <div class="brand-mark" style="width:28px;height:28px;" id="topbar-mark"></div>
-        <span class="brand-name" style="font-size:16px;">Daybook</span>
+        <span class="brand-name" style="font-size:16px;">My Day Buddy</span>
       </div>
       <button class="btn-icon" id="topbar-theme"></button>
     </div>
@@ -305,7 +306,7 @@ hr.hair{border:none;border-top:1px solid var(--border); margin:14px 0;}
 
 <script>
 /* =========================================================
-   DAYBOOK — Daily Life Tracker
+   MY DAY BUDDY — Daily Life Tracker
    Single-file app. Vanilla JS + localStorage. No build step.
    ========================================================= */
 (function(){
@@ -502,6 +503,7 @@ function save(){
   clearTimeout(saveTimer);
   saveTimer = setTimeout(()=>{
     try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){ console.warn("save failed", e); }
+    try{ if(typeof syncNativeNotifications==="function") syncNativeNotifications(); }catch(e){}
   }, 120);
 }
 
@@ -566,8 +568,8 @@ window.__closeModal = closeModal;
    RENDER: SHELL (sidebar / bottom nav / topbar)
    ========================================================= */
 function renderShell(){
-  document.getElementById("brand-mark-icon").innerHTML = icon("leaf",18);
-  document.getElementById("topbar-mark").innerHTML = icon("leaf",15);
+  document.getElementById("brand-mark-icon").innerHTML = `<svg viewBox="0 0 512 512" width="26" height="26" xmlns="http://www.w3.org/2000/svg"><path d="M370.2 219.0A120 120 0 1 1 316.4 152.1" fill="none" stroke="#9A9A9A" stroke-width="30" stroke-linecap="round"/><circle cx="361.7" cy="167.3" r="30" fill="#D3541A"/><defs><clipPath id="bm1"><circle cx="256" cy="256" r="109"/></clipPath></defs><circle cx="256" cy="428" r="116" fill="#9A9A9A" clip-path="url(#bm1)"/><circle cx="256" cy="250" r="42" fill="#F2EFE7"/></svg>`;
+  document.getElementById("topbar-mark").innerHTML = `<svg viewBox="0 0 512 512" width="21" height="21" xmlns="http://www.w3.org/2000/svg"><path d="M370.2 219.0A120 120 0 1 1 316.4 152.1" fill="none" stroke="#9A9A9A" stroke-width="30" stroke-linecap="round"/><circle cx="361.7" cy="167.3" r="30" fill="#D3541A"/><defs><clipPath id="bm2"><circle cx="256" cy="256" r="109"/></clipPath></defs><circle cx="256" cy="428" r="116" fill="#9A9A9A" clip-path="url(#bm2)"/><circle cx="256" cy="250" r="42" fill="#F2EFE7"/></svg>`;
   document.getElementById("side-avatar").textContent = state.user.avatarEmoji || "🌿";
   document.getElementById("side-name").textContent = state.user.name || "Friend";
   document.getElementById("side-date").textContent = MONTHS[new Date().getMonth()].slice(0,3)+" "+new Date().getDate();
@@ -785,7 +787,7 @@ function renderHome(){
       <div style="display:flex; gap:12px; align-items:flex-start;">
         <span style="color:var(--accent); flex-shrink:0; margin-top:1px;">${icon("smartphone",18)}</span>
         <div style="flex:1;">
-          <div style="font-weight:700; font-size:13.5px; margin-bottom:3px;">Add Daybook to your Home Screen</div>
+          <div style="font-weight:700; font-size:13.5px; margin-bottom:3px;">Add My Day Buddy to your Home Screen</div>
           <div class="muted" style="font-size:12.5px; line-height:1.55;">
             On iPhone, Safari erases a site's saved data after about a week of not opening it &mdash; that would take your journal with it. Apps on the Home Screen are exempt, so this one step is what keeps your entries safe.
             <div style="margin-top:7px; color:var(--ink);">Tap ${icon("share",13)} <strong>Share</strong>, then <strong>Add to Home Screen</strong>.</div>
@@ -802,7 +804,7 @@ function renderHome(){
       <div style="display:flex; gap:12px; align-items:flex-start;">
         <span style="color:var(--clay); flex-shrink:0; margin-top:1px;">${icon("download",18)}</span>
         <div style="flex:1;">
-          <div style="font-weight:700; font-size:13.5px; margin-bottom:3px;">Back up your Daybook</div>
+          <div style="font-weight:700; font-size:13.5px; margin-bottom:3px;">Back up your My Day Buddy</div>
           <div class="muted" style="font-size:12.5px; line-height:1.55;">Your entries live only on this device. A quick export means a cleared browser or a new phone can't take them with it.</div>
           <div class="row" style="margin-top:11px;">
             <button class="btn btn-soft" id="nudge-export">${icon("download",14)} Export now</button>
@@ -1667,8 +1669,8 @@ async function setupDeviceUnlock(){
     const cred = await navigator.credentials.create({
       publicKey: {
         challenge: crypto.getRandomValues(new Uint8Array(32)),
-        rp: { name: "Daybook" },
-        user: { id: crypto.getRandomValues(new Uint8Array(16)), name: "daybook-journal", displayName: "Daybook Journal" },
+        rp: { name: "My Day Buddy" },
+        user: { id: crypto.getRandomValues(new Uint8Array(16)), name: "daybuddy-journal", displayName: "My Day Buddy Journal" },
         pubKeyCredParams: [{type:"public-key", alg:-7},{type:"public-key", alg:-257}],
         authenticatorSelection: { authenticatorAttachment: "platform", userVerification: "required" },
         timeout: 60000,
@@ -2180,7 +2182,7 @@ async function buildJournalBook(opts, onProgress){
     ? (first===last ? fmtDateLong(first) : fmtDateLong(first)+" — "+fmtDateLong(last))
     : "No entries yet";
   const author = state.user.name || "Me";
-  const title = author + "'s Daybook";
+  const title = author + "'s My Day Buddy";
 
   const byMonth = {};
   keys.forEach(k=>{ const p=bookDateParts(k); const key=p.month+" "+p.year; byMonth[key]=(byMonth[key]||0)+1; });
@@ -2285,7 +2287,7 @@ async function buildJournalBook(opts, onProgress){
   ${contents? `<div class="toc"><h2>Contents</h2><ul>${contents}</ul></div>`:""}
   ${chapters.join("\n") || `<div class="entry"><div class="muted-i">Nothing written in this period yet.</div></div>`}
   <div class="colophon">
-    Exported from Daybook on ${esc(fmtDateLong(todayKey()))}.<br/>
+    Exported from My Day Buddy on ${esc(fmtDateLong(todayKey()))}.<br/>
     This file holds everything inside it — photos and voice notes included — so it keeps working offline, forever, with no app required.
     ${(opts.voices&&stats.voices)?"<br/>Voice notes play in a browser; they are left out when printing to PDF.":""}
   </div>
@@ -2342,7 +2344,7 @@ function openJournalBookModal(){
     try{
       const html = await buildJournalBook(opts, (d,t)=>{ prog.textContent = t? `Embedding media ${d} of ${t}...` : "Laying out pages..."; });
       const blob = new Blob([html], {type:"text/html"});
-      const name = "daybook-journal-"+todayKey()+".html";
+      const name = "daybuddy-journal-"+todayKey()+".html";
       prog.textContent = "Ready — "+fmtBytes(blob.size);
       const file = (window.File)? new File([blob], name, {type:"text/html"}) : null;
       const canShare = file && navigator.canShare && navigator.canShare({files:[file]});
@@ -2362,7 +2364,7 @@ function openJournalBookModal(){
         share.className = "btn btn-ghost";
         share.style.cssText = "width:100%; margin-top:10px;";
         share.innerHTML = `${icon("share-2",15)} Share book`;
-        share.onclick = ()=>{ navigator.share({files:[file], title:"My Daybook journal"}).catch(()=>{}); };
+        share.onclick = ()=>{ navigator.share({files:[file], title:"My Day Buddy journal"}).catch(()=>{}); };
         btn.parentNode.insertBefore(share, btn.nextSibling);
         mountIcons();
       }
@@ -2539,7 +2541,7 @@ function bindReflectionEvents(root, dateKey){
 /* =========================================================
    VIEW: CYCLE  (menstrual cycle tracking)
    Opt-in. Everything below stays in localStorage on this
-   device, exactly like the rest of Daybook — nothing is sent
+   device, exactly like the rest of My Day Buddy — nothing is sent
    anywhere. Predictions are estimates from your own logs,
    not medical advice or contraception.
    ========================================================= */
@@ -2864,7 +2866,7 @@ function renderCycle(){
         <div class="card" style="margin-top:16px;">
           <div style="font-weight:700; font-size:13.5px; margin-bottom:8px; display:flex; align-items:center; gap:6px;">${icon("shield",15)} Private by design</div>
           <p class="muted" style="font-size:12px; margin:0;">
-            Your cycle data never leaves this device — it lives in the same local storage as the rest of Daybook and is included in your JSON export.
+            Your cycle data never leaves this device — it lives in the same local storage as the rest of My Day Buddy and is included in your JSON export.
             Predictions are estimates from your own logs. They are not medical advice and should not be used as contraception.
           </p>
         </div>
@@ -3186,7 +3188,7 @@ function renderSettings(){
   const root = document.getElementById("view-root");
   const s = state.settings, u = state.user;
   root.innerHTML = `
-    <div class="hero"><div><h1>Settings</h1><div class="sub">Make Daybook yours.</div></div></div>
+    <div class="hero"><div><h1>Settings</h1><div class="sub">Make My Day Buddy yours.</div></div></div>
 
     <div class="section-title"><h2>Profile</h2></div>
     <div class="card">
@@ -3216,7 +3218,7 @@ function renderSettings(){
         <div><label class="field-label">Average cycle length</label><input type="number" id="st-cyclen" min="15" max="60" placeholder="${avgCycleLength()} (auto)" value="${s.avgCycleLengthOverride||''}"/></div>
         <div><label class="field-label">Average period length</label><input type="number" id="st-perlen" min="1" max="15" placeholder="${avgPeriodLength()} (auto)" value="${s.avgPeriodLengthOverride||''}"/></div>
       </div>
-      <p class="muted" style="font-size:11.5px; margin:-6px 0 12px;">Leave blank to let Daybook learn these from what you log.</p>
+      <p class="muted" style="font-size:11.5px; margin:-6px 0 12px;">Leave blank to let My Day Buddy learn these from what you log.</p>
       <div class="linkline"><span>Period &amp; fertile window reminders</span><label class="switch"><input type="checkbox" id="st-cycnotif" ${s.notifCycle?'checked':''}/><span class="slider"></span></label></div>
       <div class="field" style="margin-top:12px; margin-bottom:0;">
         <label class="field-label">Remind me this many days ahead</label>
@@ -3289,7 +3291,7 @@ function renderSettings(){
           : `<button class="btn btn-ghost" id="jl-setpin" style="width:100%;">${icon("lock",14)} ${s.journalPinHash?"Change PIN":"Set PIN"}</button>`
         }
       </div>
-      <p class="muted" style="font-size:11.5px; margin-top:10px;">This is a casual privacy screen for shared devices, not high-security encryption — your journal data itself is always stored locally on this device. Device unlock uses your phone's own Face ID/fingerprint/screen-lock check; Daybook never sees your biometric data.</p>
+      <p class="muted" style="font-size:11.5px; margin-top:10px;">This is a casual privacy screen for shared devices, not high-security encryption — your journal data itself is always stored locally on this device. Device unlock uses your phone's own Face ID/fingerprint/screen-lock check; My Day Buddy never sees your biometric data.</p>
     </div>
 
     <div class="section-title"><h2>Reminders</h2></div>
@@ -3297,7 +3299,7 @@ function renderSettings(){
       <div style="display:flex; gap:10px; align-items:flex-start; padding:12px 14px; margin-bottom:6px; background:var(--clay-soft); border:1px solid var(--clay); border-radius:12px;">
         <span style="color:var(--clay); flex-shrink:0; margin-top:1px;">${icon("alert-triangle",16)}</span>
         <div style="font-size:12.5px; line-height:1.55; color:var(--ink);">
-          <strong>These only appear while Daybook is open.</strong> Daybook has no server, so nothing can be pushed to your phone when the app is closed or locked. For anything you must not miss &mdash; medicines especially &mdash; set an alarm in your phone's own clock app.
+          <strong>These only appear while My Day Buddy is open.</strong> My Day Buddy has no server, so nothing can be pushed to your phone when the app is closed or locked. For anything you must not miss &mdash; medicines especially &mdash; set an alarm in your phone's own clock app.
         </div>
       </div>
       <div class="linkline"><span>Task reminders</span><label class="switch"><input type="checkbox" id="nt-tasks" ${s.notifTasks?'checked':''}/><span class="slider"></span></label></div>
@@ -3318,7 +3320,7 @@ function renderSettings(){
         <button class="btn btn-ghost" id="nt-testsound">${icon("volume-2",15)} Test Sound</button>
         <button class="btn btn-ghost" id="nt-testnotif">${icon("bell-ring",15)} Test Notification</button>
       </div>
-      <p class="muted" style="font-size:11.5px; margin-top:10px;">Browser notifications need permission and are not available on every device — where they are not, Daybook shows an in-app message instead. Either way, the app has to be open.</p>
+      <p class="muted" style="font-size:11.5px; margin-top:10px;">Browser notifications need permission and are not available on every device — where they are not, My Day Buddy shows an in-app message instead. Either way, the app has to be open.</p>
     </div>
 
     <div class="section-title"><h2>Quotes</h2></div>
@@ -3353,12 +3355,12 @@ function renderSettings(){
         <span class="muted" style="font-size:12.5px;">${s.lastExportAt? fmtDateLong(todayKey(new Date(s.lastExportAt))) : "never"}</span>
       </div>
       <p class="muted" style="font-size:11.5px; margin:12px 0 0;">Browsers can clear storage when a device runs low on space, and asking for protection makes that far less likely.</p>
-      ${isIOS() && !isStandalone() ? `<p class="muted" style="font-size:11.5px; margin:8px 0 0; color:var(--clay);">On iPhone there is a stronger rule: Safari erases a site's data after about a week without a visit. Adding Daybook to your Home Screen (Share &rarr; Add to Home Screen) exempts it. Until you do, keep exporting backups.</p>` : ""}
+      ${isIOS() && !isStandalone() ? `<p class="muted" style="font-size:11.5px; margin:8px 0 0; color:var(--clay);">On iPhone there is a stronger rule: Safari erases a site's data after about a week without a visit. Adding My Day Buddy to your Home Screen (Share &rarr; Add to Home Screen) exempts it. Until you do, keep exporting backups.</p>` : ""}
     </div>
 
     <div class="section-title"><h2>Permissions</h2></div>
     <div class="card">
-      <p class="muted" style="font-size:12.5px; margin:0 0 14px;">All optional. Daybook works fully without any of them, and asks only at the moment a feature needs one.</p>
+      <p class="muted" style="font-size:12.5px; margin:0 0 14px;">All optional. My Day Buddy works fully without any of them, and asks only at the moment a feature needs one.</p>
       ${PERMISSIONS.map(p=>`
         <div style="display:flex; gap:11px; align-items:flex-start; padding:11px 2px; border-bottom:1px solid var(--border);">
           <span style="color:var(--ink-soft); flex-shrink:0; margin-top:1px;">${icon(p.icon,16)}</span>
@@ -3596,10 +3598,10 @@ function shouldNudgeInstall(){
 
 /* ---------- permissions summary ---------- */
 const PERMISSIONS = [
-  {icon:"bell", name:"Notifications", why:"Used for the reminders you switch on — tasks, medicines, focus sessions and cycle dates. Asked for the first time you enable one. Note that reminders are generated by the app itself, so they only appear while Daybook is open."},
+  {icon:"bell", name:"Notifications", why:"Used for the reminders you switch on — tasks, medicines, focus sessions and cycle dates. Asked for the first time you enable one. Note that reminders are generated by the app itself, so they only appear while My Day Buddy is open."},
   {icon:"mic", name:"Microphone", why:"Only used while you are recording a voice note in the Journal. Recording stops the moment you tap stop, and the audio is saved on this device."},
-  {icon:"hard-drive", name:"Persistent storage", why:"Asks your browser not to auto-delete Daybook's data when the device is low on space. Strongly recommended, since your data lives only on this device."},
-  {icon:"fingerprint", name:"Device unlock (Face ID / fingerprint)", why:"Optional, only if you lock your Journal. Your browser performs the check — Daybook never receives your biometric data."},
+  {icon:"hard-drive", name:"Persistent storage", why:"Asks your browser not to auto-delete My Day Buddy's data when the device is low on space. Strongly recommended, since your data lives only on this device."},
+  {icon:"fingerprint", name:"Device unlock (Face ID / fingerprint)", why:"Optional, only if you lock your Journal. Your browser performs the check — My Day Buddy never receives your biometric data."},
 ];
 
 /* ---------- legal documents ---------- */
@@ -3611,8 +3613,8 @@ function legalDocHtml(id){
 
   if(id==="privacy"){
     return STAMP
-    + P("Short version: Daybook has no account system, no server and no analytics. Everything you type stays in your own browser. Nobody, including the developer, can read it.")
-    + H("What Daybook stores, and where")
+    + P("Short version: My Day Buddy has no account system, no server and no analytics. Everything you type stays in your own browser. Nobody, including the developer, can read it.")
+    + H("What My Day Buddy stores, and where")
     + P("All of your entries — tasks, habits, goals, focus sessions, journal text, mood, health logs and cycle data — are written to <strong>localStorage</strong> in the browser you are using right now. Journal photos and voice notes are stored in <strong>IndexedDB</strong> on the same device. None of it is transmitted anywhere.")
     + P("Because the data is tied to one browser on one device, it does not sync between your phone and your computer, and it is erased if you clear your browsing data, use a private window, or uninstall the app.")
     + H("What is never collected")
@@ -3621,19 +3623,19 @@ function legalDocHtml(id){
           "No advertising, no advertising identifiers, no cookies used for tracking.",
           "No selling or sharing of data with third parties, because no data reaches the developer in the first place."])
     + H("Third parties that see a network request")
-    + P("Daybook is a web page, so loading it involves ordinary web requests. These parties can see your IP address and that you requested a file, but never your entries:")
+    + P("My Day Buddy is a web page, so loading it involves ordinary web requests. These parties can see your IP address and that you requested a file, but never your entries:")
     + UL(["<strong>GitHub Pages</strong> — hosts the app files.",
           "<strong>Google Fonts</strong> (fonts.googleapis.com, fonts.gstatic.com) — supplies the typefaces.",
           "<strong>unpkg / cdnjs</strong> — supplies the icon library."])
     + P("Once loaded, the app works fully offline and makes no further requests.")
     + H("Sensitive categories")
-    + P("Daybook lets you record health-related information, including mood, sleep, medicines and — if you turn it on — menstrual cycle data. This is treated exactly like every other entry: written to your device only, never uploaded, never analysed by anyone but you. Cycle tracking is off by default and can be switched off at any time in Settings.")
+    + P("My Day Buddy lets you record health-related information, including mood, sleep, medicines and — if you turn it on — menstrual cycle data. This is treated exactly like every other entry: written to your device only, never uploaded, never analysed by anyone but you. Cycle tracking is off by default and can be switched off at any time in Settings.")
     + H("Your control over the data")
     + UL(["<strong>Export</strong> — Settings → Data → Export JSON gives you a complete copy of everything.",
           "<strong>Delete</strong> — Settings → Data → Reset All Data erases it permanently. Clearing your browser's site data for this address does the same.",
           "There is nothing to request from the developer, because the developer holds nothing."])
     + H("Children")
-    + P("Daybook is not directed at children under 13, and no data is knowingly collected from them.")
+    + P("My Day Buddy is not directed at children under 13, and no data is knowingly collected from them.")
     + H("Changes")
     + P("If this policy changes materially you will be asked to review it the next time you open the app.")
     + H("Contact")
@@ -3642,23 +3644,23 @@ function legalDocHtml(id){
 
   if(id==="terms"){
     return STAMP
-    + P("By using Daybook you agree to these terms. If you do not agree, please stop using the app.")
-    + H("What Daybook is")
-    + P("Daybook is a free, offline-first personal tracking app for tasks, habits, goals, focus time, journalling, general wellbeing and — optionally — menstrual cycles. It is provided as-is, at no cost, with no account and no subscription.")
+    + P("By using My Day Buddy you agree to these terms. If you do not agree, please stop using the app.")
+    + H("What My Day Buddy is")
+    + P("My Day Buddy is a free, offline-first personal tracking app for tasks, habits, goals, focus time, journalling, general wellbeing and — optionally — menstrual cycles. It is provided as-is, at no cost, with no account and no subscription.")
     + H("Your data is your responsibility")
-    + P("Daybook stores everything on your device and keeps no backup. You are responsible for exporting your own copies. The developer cannot recover data that is lost because a browser cleared its storage, a device was reset or replaced, or an entry was deleted.")
+    + P("My Day Buddy stores everything on your device and keeps no backup. You are responsible for exporting your own copies. The developer cannot recover data that is lost because a browser cleared its storage, a device was reset or replaced, or an entry was deleted.")
     + P("Use <strong>Settings → Data → Export JSON</strong> regularly if your entries matter to you.")
     + H("Acceptable use")
-    + UL(["Use Daybook for your own personal tracking.",
+    + UL(["Use My Day Buddy for your own personal tracking.",
           "Do not use it to store other people's personal information without their knowledge.",
           "Do not use it for anything unlawful."])
     + H("No warranty")
-    + P("Daybook is provided “as is” and “as available”, without warranties of any kind, express or implied, including fitness for a particular purpose.")
-  + P("<strong>Reminders only appear while Daybook is open.</strong> They are produced by the app itself, not pushed from a server, so nothing will reach you when the app is closed or your phone is locked. Do not rely on them for anything that matters — medication timing above all. Use your phone's own alarm or reminders app for that.")
+    + P("My Day Buddy is provided “as is” and “as available”, without warranties of any kind, express or implied, including fitness for a particular purpose.")
+  + P("<strong>Reminders only appear while My Day Buddy is open.</strong> They are produced by the app itself, not pushed from a server, so nothing will reach you when the app is closed or your phone is locked. Do not rely on them for anything that matters — medication timing above all. Use your phone's own alarm or reminders app for that.")
     + H("Limitation of liability")
-    + P("To the maximum extent permitted by law, the developer is not liable for any loss of data, missed reminder, or any indirect or consequential loss arising from your use of Daybook.")
+    + P("To the maximum extent permitted by law, the developer is not liable for any loss of data, missed reminder, or any indirect or consequential loss arising from your use of My Day Buddy.")
     + H("Open source")
-    + P(`Daybook's source code is published under the MIT Licence at <a href="${REPO_URL}" target="_blank" rel="noopener" style="color:var(--accent); font-weight:600;">github.com/GauravvDev/Daybook-app-</a>. The MIT Licence governs the code; these terms govern your use of the hosted app.`)
+    + P(`My Day Buddy's source code is published under the MIT Licence at <a href="${REPO_URL}" target="_blank" rel="noopener" style="color:var(--accent); font-weight:600;">github.com/GauravvDev/Daybook-app-</a>. The MIT Licence governs the code; these terms govern your use of the hosted app.`)
     + H("Changes and governing law")
     + P("These terms may be updated; you will be asked to review material changes in-app. They are governed by the laws of India.")
     + H("Contact")
@@ -3667,10 +3669,10 @@ function legalDocHtml(id){
 
   /* health */
   return STAMP
-  + P("<strong>Daybook is not a medical device and does not provide medical advice.</strong>")
+  + P("<strong>My Day Buddy is not a medical device and does not provide medical advice.</strong>")
   + H("General health tracking")
-  + P("Water, sleep, mood, workout and medicine entries are a personal diary. Daybook does not diagnose anything and does not check your entries for safety.")
-  + P("<strong>Medicine reminders only appear while the app is open on screen.</strong> They are not a clinical alert system and will not wake your phone. Never rely on a Daybook reminder for medication or treatment timing — set a real alarm.")
+  + P("Water, sleep, mood, workout and medicine entries are a personal diary. My Day Buddy does not diagnose anything and does not check your entries for safety.")
+  + P("<strong>Medicine reminders only appear while the app is open on screen.</strong> They are not a clinical alert system and will not wake your phone. Never rely on a reminder from My Day Buddy for medication or treatment timing — set a real alarm.")
   + H("Menstrual cycle predictions")
   + P("Predicted period dates, fertile windows and ovulation days are simple arithmetic based on the averages of what you have logged. They are estimates only.")
   + UL(["<strong>Not contraception.</strong> Do not use the fertile window to plan or avoid pregnancy.",
@@ -3723,13 +3725,13 @@ function openLegalConsentModal(){
   openModal(`
     <div class="modal-head"><h3>Before you continue</h3></div>
     <p class="muted" style="font-size:13.5px; line-height:1.6; margin-top:-8px;">
-      Daybook now has published terms, a privacy policy and a health disclaimer. Nothing about how your data is handled has changed — it still never leaves this device — but please have a look and confirm.
+      My Day Buddy now has published terms, a privacy policy and a health disclaimer. Nothing about how your data is handled has changed — it still never leaves this device — but please have a look and confirm.
     </p>
     <div class="card" style="background:var(--bg-soft); box-shadow:none; padding:14px; margin-bottom:16px;">
       <div style="display:flex; gap:10px; align-items:flex-start;">
         <input type="checkbox" id="lc-agree" style="width:18px;height:18px;margin-top:2px;flex-shrink:0;"/>
         <label for="lc-agree" style="font-size:13px; line-height:1.55; cursor:pointer;">
-          I have read and agree to the ${legalLinksHtml()}. I understand my data is stored only on this device and that Daybook does not provide medical advice.
+          I have read and agree to the ${legalLinksHtml()}. I understand my data is stored only on this device and that My Day Buddy does not provide medical advice.
         </label>
       </div>
     </div>
@@ -3746,7 +3748,7 @@ function exportData(){
   const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
-  a.href = url; a.download = "daybook-export-"+todayKey()+".json";
+  a.href = url; a.download = "daybuddy-export-"+todayKey()+".json";
   document.body.appendChild(a); a.click(); a.remove();
   URL.revokeObjectURL(url);
   state.settings.lastExportAt = Date.now(); save();
@@ -3801,6 +3803,13 @@ function requestNotifPermissionThenTest(){
 }
 function notify(title, body){
   playSound();
+  if(Native.on){
+    try{
+      Native.LN.schedule({ notifications:[{ id: nid("now-"+title+"-"+Date.now()), title, body,
+        schedule:{ at: new Date(Date.now()+1200) }, smallIcon:"ic_stat_daybook", channelId:"daybook-reminders" }] });
+      return;
+    }catch(e){}
+  }
   if("Notification" in window && Notification.permission==="granted"){
     try{ new Notification(title, {body, icon:"icon-192.png"}); return; }catch(e){}
   }
@@ -3845,7 +3854,7 @@ const ONBOARD_HABIT_SUGGESTIONS = [
 ];
 function openOnboardingModal(){
   openModal(`
-    <div class="modal-head"><h3>Welcome to Daybook 👋</h3></div>
+    <div class="modal-head"><h3>Welcome to My Day Buddy 👋</h3></div>
     <p class="muted" style="font-size:13px; margin-top:-8px; margin-bottom:16px;">Let's set a few things up. Everything here can be changed anytime later.</p>
 
     <div class="field"><label class="field-label">Your name</label><input type="text" id="ob-name" placeholder="e.g. Alex" value="${escapeHtml(state.user.name||'')}"/></div>
@@ -3880,7 +3889,7 @@ function openOnboardingModal(){
       <div style="display:flex; gap:10px; align-items:flex-start;">
         <input type="checkbox" id="ob-agree" style="width:18px;height:18px;margin-top:2px;flex-shrink:0;"/>
         <label for="ob-agree" style="font-size:12.5px; line-height:1.55; cursor:pointer;">
-          I have read and agree to the ${legalLinksHtml()}. I understand that Daybook stores everything on this device only, keeps no backup of its own, and does not provide medical advice.
+          I have read and agree to the ${legalLinksHtml()}. I understand that My Day Buddy stores everything on this device only, keeps no backup of its own, and does not provide medical advice.
         </label>
       </div>
     </div>
@@ -3959,12 +3968,152 @@ function init(){
   checkDeviceUnlockSupport();
   migrateBase64MediaToIndexedDB();
 }
+
+/* ================= NATIVE LOCAL NOTIFICATIONS (Capacitor) =================
+   On the web this whole block is inert and the polling engine below runs as
+   before. Inside the Capacitor Android build, reminders are handed to
+   Android's alarm scheduler instead, so they fire when the app is CLOSED.
+   ------------------------------------------------------------------------ */
+const Native = {
+  get on(){
+    try{
+      return !!(window.Capacitor && typeof window.Capacitor.isNativePlatform === "function"
+                && window.Capacitor.isNativePlatform()
+                && window.Capacitor.Plugins && window.Capacitor.Plugins.LocalNotifications);
+    }catch(e){ return false; }
+  },
+  get LN(){ return window.Capacitor.Plugins.LocalNotifications; }
+};
+
+/* Stable positive 31-bit id from a string, so re-scheduling replaces cleanly. */
+function nid(str){
+  let h = 5381;
+  for(let i=0;i<str.length;i++){ h = ((h<<5) + h + str.charCodeAt(i)) | 0; }
+  return Math.abs(h) % 2000000000 + 1;
+}
+function atLocal(dateKey, hhmm){
+  const [y,m,d] = dateKey.split("-").map(Number);
+  const [hh,mi] = hhmm.split(":").map(Number);
+  return new Date(y, m-1, d, hh, mi, 0, 0);
+}
+
+/* Everything My Day Buddy should wake the phone for, for the next `days` days. */
+function collectNativeReminders(days){
+  const out = [];
+  const s = state.settings;
+  const now = Date.now();
+  const push = (key, title, body, when, extra) => {
+    if(!(when instanceof Date) || isNaN(when) || when.getTime() <= now + 5000) return;
+    const o = { id: nid(key), title, body, schedule: Object.assign({ at: when, allowWhileIdle: true }, extra||{}),
+                smallIcon: "ic_stat_daybook", channelId: "daybook-reminders" };
+    out.push(o);
+  };
+
+  for(let dOff=0; dOff<days; dOff++){
+    const dk = addDays(todayKey(), dOff);
+
+    if(s.notifTasks){
+      state.tasks.filter(t=>t.reminder && !t.completed && t.date===dk && t.time).forEach(t=>{
+        push("task-"+t.id+"-"+dk, "Task reminder", t.title, atLocal(dk, t.time));
+      });
+    }
+    if(s.notifFocusSessions !== false){
+      state.focusSessions.filter(f=>!f.completed && f.date===dk && f.startTime).forEach(f=>{
+        push("session-"+f.id+"-"+dk, "Session reminder",
+             (f.label||sessionTypeMeta(f.type).label)+" is scheduled now", atLocal(dk, f.startTime));
+      });
+    }
+    if(s.notifMeds){
+      const taken = state.medicineLogs[dk] || {};
+      state.medicines.filter(m=>m.time && !taken[m.id]).forEach(m=>{
+        push("med-"+m.id+"-"+dk, "Medicine reminder",
+             m.name + (m.dosage ? " — "+m.dosage : ""), atLocal(dk, m.time));
+      });
+    }
+  }
+
+  if(cycleEnabled() && s.notifCycle){
+    const pred = cyclePrediction();
+    if(pred){
+      const lead = (s.cycleReminderDays==null) ? 2 : s.cycleReminderDays;
+      if(lead > 0){
+        const warn = addDays(pred.nextStart, -lead);
+        push("cyc-warn-"+warn, "Period coming up",
+             "Predicted to start in "+lead+" day"+(lead===1?"":"s")+", around "+fmtDateLong(pred.nextStart)+".",
+             atLocal(warn, "09:00"));
+      }
+      push("cyc-due-"+pred.nextStart, "Period predicted today",
+           "Log it in My Day Buddy so the next prediction stays accurate.", atLocal(pred.nextStart, "09:00"));
+      if(pred.fertileStart){
+        push("cyc-fert-"+pred.fertileStart, "Fertile window starting",
+             "Estimated from your logged cycles — not a contraceptive method.", atLocal(pred.fertileStart, "09:00"));
+      }
+    }
+  }
+  return out.slice(0, 60); /* keep well under Android's pending-alarm ceiling */
+}
+
+async function openExactAlarmSettings(){
+  if(!Native.on) return false;
+  try{
+    if(typeof Native.LN.changeExactNotificationSetting === "function"){
+      await Native.LN.changeExactNotificationSetting();
+      return true;
+    }
+  }catch(e){}
+  return false;
+}
+let nativeSyncTimer = null;
+async function syncNativeNotifications(){
+  if(!Native.on) return;
+  clearTimeout(nativeSyncTimer);
+  nativeSyncTimer = setTimeout(async ()=>{
+    try{
+      let perm = await Native.LN.checkPermissions();
+      if(perm.display !== "granted"){
+        perm = await Native.LN.requestPermissions();
+        if(perm.display !== "granted") return;
+      }
+      try{
+        await Native.LN.createChannel({ id:"daybook-reminders", name:"Reminders",
+          description:"Task, medicine, focus and cycle reminders", importance:4, visibility:1 });
+      }catch(e){}
+      const pending = await Native.LN.getPending();
+      if(pending && pending.notifications && pending.notifications.length){
+        await Native.LN.cancel({ notifications: pending.notifications.map(n=>({id:n.id})) });
+      }
+      const items = collectNativeReminders(14);
+      if(!items.length) return;
+      /* Android 14+ refuses exact alarms unless the user has granted them.
+         Try exact first, fall back to inexact rather than losing reminders. */
+      try{
+        await Native.LN.schedule({ notifications: items });
+      }catch(err){
+        const relaxed = items.map(n=>{
+          const c = JSON.parse(JSON.stringify(n));
+          c.schedule = { at: n.schedule.at, allowWhileIdle: false };
+          return c;
+        });
+        await Native.LN.schedule({ notifications: relaxed });
+        state.settings.exactAlarmsBlocked = true; 
+        try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e2){}
+      }
+    }catch(e){ console.warn("native notification sync failed", e); }
+  }, 400);
+}
+
 /* ---------------- reminder engine (fixed) ----------------
    Runs every 15s (not gated to an exact second) and dedupes with
    a fired-set so a throttled/background tab still catches reminders
    without spamming repeats. */
 const firedReminders = new Set();
 function startReminderEngine(){
+  if(Native.on){
+    /* Android schedules these itself; polling would double-fire. */
+    syncNativeNotifications();
+    document.addEventListener("visibilitychange", ()=>{ if(!document.hidden) syncNativeNotifications(); });
+    return;
+  }
   checkReminders();
   setInterval(checkReminders, 15000);
 }
@@ -4002,7 +4151,7 @@ function checkReminders(){
       }
       if(today===pred.nextStart && !firedReminders.has("cyc-due-"+today)){
         firedReminders.add("cyc-due-"+today);
-        notify("Period predicted today", "Log it in Daybook so the next prediction stays accurate.");
+        notify("Period predicted today", "Log it in My Day Buddy so the next prediction stays accurate.");
       }
       if(today===pred.fertileStart && !firedReminders.has("cyc-fert-"+today)){
         firedReminders.add("cyc-fert-"+today);
