@@ -1,4 +1,4 @@
-/* Daybook service worker.
+/* My Day Buddy service worker.
  *
  * Strategy, deliberately split:
  *   - The app shell (navigations + index.html) is NETWORK FIRST, so a new
@@ -9,7 +9,7 @@
  *     cache immediately and refreshed in the background. Those rarely change
  *     and speed matters more than freshness.
  */
-const CACHE_NAME = "daybook-cache-v6";
+const CACHE_NAME = "daybuddy-cache-v9";
 const SHELL = ["./", "./index.html", "./manifest.json", "./icon.svg",
                "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png"];
 const NETWORK_TIMEOUT_MS = 3500;
