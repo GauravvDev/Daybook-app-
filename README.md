@@ -1,4 +1,4 @@
-# Daybook
+# My Day Buddy
 
 Honestly, I built this for myself. I kept trying to track my routine tasks, habits, water, whatever and kept bouncing off apps that felt like spreadsheets wearing a productivity costume. So I made something calmer. Something I'd actually open every day instead of abandoning after a week.
 
@@ -6,7 +6,7 @@ Turns out it grew into a full daily companion. Track your day, understand yourse
 
 ## Try it
 
-👉 **[Open Daybook](https://gauravvdev.github.io/Daybook-app-/)**
+👉 **[Open My Day Buddy](https://gauravvdev.github.io/Daybook-app-/)**
 
 ## What's actually in here
 
