@@ -1,18 +1,37 @@
 {
   "id": "/Daybook-app-/index.html",
-  "name": "Daybook — Daily Life Tracker",
-  "short_name": "Daybook",
-  "description": "Track your day. Understand yourself. Build a better life.",
+  "name": "My Day Buddy — Routine Tracker",
+  "short_name": "Day Buddy",
+  "description": "Track your day. Build your routine. Everything stays on your phone.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "background_color": "#F5F3EE",
   "theme_color": "#4F7A68",
   "orientation": "portrait-primary",
-  "categories": ["health", "lifestyle", "productivity"],
+  "categories": [
+    "health",
+    "lifestyle",
+    "productivity"
+  ],
   "icons": [
-    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
-    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-maskable-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
   ]
 }
