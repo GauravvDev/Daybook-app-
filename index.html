@@ -68,8 +68,7 @@ a{color:inherit;}
   padding:24px 16px; display:flex; flex-direction:column; gap:3px; position:sticky; top:0; height:100vh; overflow-y:auto;
 }
 .brand{display:flex; align-items:center; gap:10px; padding:6px 10px 22px;}
-.brand-mark{width:34px;height:34px;border-radius:10px;background:#141513; display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;}
-.brand-mark svg{display:block;}
+.brand-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(155deg,var(--accent),var(--clay)); display:flex;align-items:center;justify-content:center;color:var(--accent-ink);flex-shrink:0;}
 .brand-name{font-family:'Fraunces',serif; font-weight:600; font-size:19px;}
 .nav-item{
   display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:12px; cursor:pointer;
@@ -568,8 +567,8 @@ window.__closeModal = closeModal;
    RENDER: SHELL (sidebar / bottom nav / topbar)
    ========================================================= */
 function renderShell(){
-  document.getElementById("brand-mark-icon").innerHTML = `<svg viewBox="0 0 512 512" width="26" height="26" xmlns="http://www.w3.org/2000/svg"><path d="M370.2 219.0A120 120 0 1 1 316.4 152.1" fill="none" stroke="#9A9A9A" stroke-width="30" stroke-linecap="round"/><circle cx="361.7" cy="167.3" r="30" fill="#D3541A"/><defs><clipPath id="bm1"><circle cx="256" cy="256" r="109"/></clipPath></defs><circle cx="256" cy="428" r="116" fill="#9A9A9A" clip-path="url(#bm1)"/><circle cx="256" cy="250" r="42" fill="#F2EFE7"/></svg>`;
-  document.getElementById("topbar-mark").innerHTML = `<svg viewBox="0 0 512 512" width="21" height="21" xmlns="http://www.w3.org/2000/svg"><path d="M370.2 219.0A120 120 0 1 1 316.4 152.1" fill="none" stroke="#9A9A9A" stroke-width="30" stroke-linecap="round"/><circle cx="361.7" cy="167.3" r="30" fill="#D3541A"/><defs><clipPath id="bm2"><circle cx="256" cy="256" r="109"/></clipPath></defs><circle cx="256" cy="428" r="116" fill="#9A9A9A" clip-path="url(#bm2)"/><circle cx="256" cy="250" r="42" fill="#F2EFE7"/></svg>`;
+  document.getElementById("brand-mark-icon").innerHTML = icon("leaf",18);
+  document.getElementById("topbar-mark").innerHTML = icon("leaf",15);
   document.getElementById("side-avatar").textContent = state.user.avatarEmoji || "🌿";
   document.getElementById("side-name").textContent = state.user.name || "Friend";
   document.getElementById("side-date").textContent = MONTHS[new Date().getMonth()].slice(0,3)+" "+new Date().getDate();
