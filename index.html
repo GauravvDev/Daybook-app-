@@ -68,7 +68,20 @@ a{color:inherit;}
   padding:24px 16px; display:flex; flex-direction:column; gap:3px; position:sticky; top:0; height:100vh; overflow-y:auto;
 }
 .brand{display:flex; align-items:center; gap:10px; padding:6px 10px 22px;}
-.brand-mark{width:34px;height:34px;border-radius:10px;background:linear-gradient(155deg,var(--accent),var(--clay)); display:flex;align-items:center;justify-content:center;color:var(--accent-ink);flex-shrink:0;}
+.cal-cell.kept{box-shadow:inset 0 0 0 1.5px var(--accent);}
+.cal-flame{position:absolute; bottom:3px; left:50%; transform:translateX(-50%); opacity:.75; line-height:0;}
+.streak-dots{display:flex; gap:4px; margin-top:5px;}
+.sdot{width:9px; height:9px; border-radius:50%; display:inline-block;}
+.sdot.on{background:var(--accent);}
+.sdot.miss{background:var(--border); }
+.sdot.off{background:transparent; box-shadow:inset 0 0 0 1px var(--border);}
+.day-brief{margin-top:18px; border-left:3px solid var(--accent);}
+.brief-label{font-size:11px; letter-spacing:.07em; text-transform:uppercase; color:var(--muted); display:flex; align-items:center; gap:5px; margin-bottom:7px;}
+.brief-head{font-family:'Fraunces',serif; font-size:17.5px; font-weight:600; line-height:1.35;}
+.brief-body{margin-top:7px; color:var(--muted); font-size:13.5px; line-height:1.65;}
+.streak-tag{background:rgba(211,84,26,.12); color:var(--clay,#C4623F); font-weight:700;}
+.brand-mark{width:34px;height:34px;border-radius:10px;background:#FFF8F0; box-shadow:inset 0 0 0 1px #E4D9CA; display:flex;align-items:center;justify-content:center;flex-shrink:0;overflow:hidden;}
+.brand-mark svg{display:block;}
 .brand-name{font-family:'Fraunces',serif; font-weight:600; font-size:19px;}
 .nav-item{
   display:flex; align-items:center; gap:12px; padding:11px 12px; border-radius:12px; cursor:pointer;
@@ -376,8 +389,8 @@ const NAV_ITEMS = [
   {id:"insights", label:"Insights", icon:"bar-chart-3"},
   {id:"settings", label:"Settings", icon:"settings"},
 ];
-const BOTTOM_NAV = ["home","tasks","focus","journal","more"];
-const MORE_SHEET_ITEMS = ["habits","goals","health","cycle","calendar","insights","settings"];
+const BOTTOM_NAV = ["home","tasks","calendar","focus","journal","more"];
+const MORE_SHEET_ITEMS = ["habits","goals","health","cycle","insights","settings"];
 const GOAL_TYPES = [
   {id:"project", label:"Project", icon:"briefcase"},
   {id:"study", label:"Study / Exam", icon:"graduation-cap"},
@@ -507,7 +520,7 @@ function save(){
 }
 
 /* ---------------- app runtime state ---------------- */
-const ui = { route: state.lastRoute || "home", calMonth: new Date(), calSelected: todayKey(), moreOpen:false, journalUnlocked:false, cycMonth:null, cycSelected:null, pomodoro:{running:false, mode:"focus", remaining: (state.settings.pomodoroFocusMin*60), interval:null, activeSessionId:null} };
+const ui = { route: state.lastRoute || "home", calMonth: new Date(), calSelected: todayKey(), moreOpen:false, journalUnlocked:false, cycMonth:null, cycSelected:null, pomodoro:{running:false, mode:"focus", remaining: (state.settings.pomodoroFocusMin*60), interval:null, activeSessionId:null, elapsedSec:0} };
 
 function setRoute(r){
   ui.route = r; ui.moreOpen=false; state.lastRoute = r; save();
@@ -567,8 +580,8 @@ window.__closeModal = closeModal;
    RENDER: SHELL (sidebar / bottom nav / topbar)
    ========================================================= */
 function renderShell(){
-  document.getElementById("brand-mark-icon").innerHTML = icon("leaf",18);
-  document.getElementById("topbar-mark").innerHTML = icon("leaf",15);
+  document.getElementById("brand-mark-icon").innerHTML = `<svg viewBox="0 0 512 512" width="26" height="26" xmlns="http://www.w3.org/2000/svg"><ellipse cx="261.4" cy="71.8" rx="44.1" ry="41.4" fill="#77876D"/><ellipse cx="250.6" cy="177.4" rx="91.8" ry="52.2" fill="#61735B"/><ellipse cx="263.2" cy="301.9" rx="127.8" ry="60.3" fill="#DDA38D"/><rect x="89.5" y="371.8" width="333" height="109.8" rx="54.9" fill="#E2C49E"/></svg>`;
+  document.getElementById("topbar-mark").innerHTML = `<svg viewBox="0 0 512 512" width="22" height="22" xmlns="http://www.w3.org/2000/svg"><ellipse cx="261.4" cy="71.8" rx="44.1" ry="41.4" fill="#77876D"/><ellipse cx="250.6" cy="177.4" rx="91.8" ry="52.2" fill="#61735B"/><ellipse cx="263.2" cy="301.9" rx="127.8" ry="60.3" fill="#DDA38D"/><rect x="89.5" y="371.8" width="333" height="109.8" rx="54.9" fill="#E2C49E"/></svg>`;
   document.getElementById("side-avatar").textContent = state.user.avatarEmoji || "🌿";
   document.getElementById("side-name").textContent = state.user.name || "Friend";
   document.getElementById("side-date").textContent = MONTHS[new Date().getMonth()].slice(0,3)+" "+new Date().getDate();
@@ -636,11 +649,72 @@ function greeting(){
   if(h<17) return "Good afternoon";
   return "Good evening";
 }
+/* ---------- repeating tasks ---------- */
+const REPEAT_OPTIONS = [
+  {id:"none",     label:"Does not repeat",       short:""},
+  {id:"daily",    label:"Every day",              short:"Daily"},
+  {id:"weekdays", label:"Weekdays (Mon-Fri)",     short:"Weekdays"},
+  {id:"weekly",   label:"Every week on this day", short:"Weekly"},
+];
+function taskRepeats(t){ return !!t.repeat && t.repeat !== "none"; }
+function taskOccursOn(t, key){
+  if(!taskRepeats(t)) return t.date === key;
+  if(!t.date || key < t.date) return false;
+  const dow = new Date(key+"T00:00:00").getDay();
+  if(t.repeat === "daily") return true;
+  if(t.repeat === "weekdays") return dow>=1 && dow<=5;
+  if(t.repeat === "weekly") return dow === new Date(t.date+"T00:00:00").getDay();
+  return false;
+}
+function taskDoneOn(t, key){
+  return taskRepeats(t) ? !!(t.completions||{})[key] : !!t.completed;
+}
+function setTaskDone(t, key, val){
+  if(taskRepeats(t)){
+    if(!t.completions) t.completions = {};
+    if(val) t.completions[key] = true; else delete t.completions[key];
+  } else t.completed = !!val;
+}
+function tasksForDate(key){ return state.tasks.filter(t=> taskOccursOn(t,key)); }
+function repeatingTasks(){ return state.tasks.filter(taskRepeats); }
+/* A day counts as kept when every repeating task due that day was done. */
+function dayStreakKept(key){
+  const due = repeatingTasks().filter(t=> taskOccursOn(t,key));
+  if(!due.length) return null;
+  return due.every(t=> taskDoneOn(t,key));
+}
+function overallStreak(){
+  let key = todayKey();
+  if(dayStreakKept(key) === false) key = addDays(key,-1);
+  let n=0, guard=0;
+  while(guard++ < 730){
+    const kept = dayStreakKept(key);
+    if(kept === false) break;
+    if(kept === true) n++;
+    key = addDays(key,-1);
+  }
+  return n;
+}
+/* Current run of completed occurrences. Today still pending does not break it. */
+function taskStreak(t, upto){
+  if(!taskRepeats(t)) return 0;
+  let key = upto || todayKey();
+  if(taskOccursOn(t,key) && !taskDoneOn(t,key)) key = addDays(key,-1);
+  let streak = 0, guard = 0;
+  while(guard++ < 730){
+    if(!t.date || key < t.date) break;
+    if(taskOccursOn(t,key)){
+      if(taskDoneOn(t,key)) streak++; else break;
+    }
+    key = addDays(key,-1);
+  }
+  return streak;
+}
 function dayCompletionPct(dateKey){
   dateKey = dateKey || todayKey();
   let total=0, done=0;
-  const dayTasks = state.tasks.filter(t=>t.date===dateKey);
-  total += dayTasks.length; done += dayTasks.filter(t=>t.completed).length;
+  const dayTasks = tasksForDate(dateKey);
+  total += dayTasks.length; done += dayTasks.filter(t=>taskDoneOn(t,dateKey)).length;
   total += state.habits.length; done += state.habits.filter(h=> (state.habitLogs[dateKey]||{})[h.id]).length;
   const waterGoal = state.settings.waterGoalMl; const waterVal = (state.water.logs[dateKey]||0);
   total += 1; if(waterVal>=waterGoal) done+=1; else done += clamp(waterVal/waterGoal,0,1);
@@ -676,10 +750,68 @@ function ringSvg(pct, size, strokeW){
   </svg>`;
 }
 
+/* ---------- day brief ---------- */
+function dayBriefHtml(){
+  const today = todayKey();
+  const hour = new Date().getHours();
+  const evening = hour >= 17;
+  const tasks = tasksForDate(today);
+  const open = tasks.filter(t=>!taskDoneOn(t,today));
+  const done = tasks.filter(t=>taskDoneOn(t,today));
+  const habits = state.habits || [];
+  const hDone = habits.filter(h=>(state.habitLogs[today]||{})[h.id]);
+  const focusMin = todayFocusMinutes();
+  const slots = (state.focusSessions||[]).filter(s=>s.date===today);
+  const openSlots = slots.filter(s=>!s.completed);
+  const timed = open.filter(t=>t.time).sort((a,b)=>a.time.localeCompare(b.time));
+  const nowHM = String(hour).padStart(2,"0")+":"+String(new Date().getMinutes()).padStart(2,"0");
+  const next = timed.find(t=>t.time>=nowHM) || timed[0];
+  const streak = overallStreak();
+  const plural = (n,w)=> n+" "+w+(n===1?"":"s");
+  let head, lines = [];
+
+  if(!evening){
+    if(!tasks.length && !habits.length){
+      head = "Nothing on the list yet.";
+      lines.push("Add a task or a habit and this fills itself in.");
+    } else {
+      head = open.length ? plural(open.length,"thing")+" to do today." : "Everything on today's list is done.";
+      if(next) lines.push("Next up is "+escapeHtml(next.title)+(next.time?" at "+fmtTime12(next.time):"")+".");
+      if(habits.length) lines.push(hDone.length===habits.length
+        ? "All "+plural(habits.length,"habit")+" already ticked."
+        : (habits.length-hDone.length)+" of "+plural(habits.length,"habit")+" still waiting.");
+      if(openSlots.length) lines.push(plural(openSlots.length,"focus slot")+" booked.");
+      if(streak>0) lines.push("You're "+plural(streak,"day")+" into your streak - keep it.");
+    }
+  } else {
+    if(!tasks.length && !habits.length){
+      head = "Quiet day.";
+      lines.push("Nothing was on the list to begin with.");
+    } else {
+      head = done.length
+        ? "You finished "+done.length+" of "+plural(tasks.length,"task")+" today."
+        : "Nothing ticked off today.";
+      if(habits.length) lines.push(hDone.length+" of "+plural(habits.length,"habit")+" kept.");
+      if(focusMin>0) lines.push(focusMin>=60
+        ? "You focused for "+(Math.round(focusMin/60*10)/10)+"h."
+        : "You focused for "+plural(focusMin,"minute")+".");
+      if(open.length) lines.push(open.length===1
+        ? "Still open: "+escapeHtml(open[0].title)+"."
+        : plural(open.length,"thing")+" still open, including "+escapeHtml(open[0].title)+".");
+      if(streak>0) lines.push("Streak stands at "+plural(streak,"day")+".");
+      else if(repeatingTasks().length) lines.push("The streak broke today - it restarts tomorrow.");
+    }
+  }
+  return `<div class="card day-brief">
+    <div class="brief-label">${icon(evening?"moon":"sunrise",13)} ${evening?"This evening":"Your day ahead"}</div>
+    <div class="brief-head">${head}</div>
+    ${lines.length?`<div class="brief-body">${lines.map(l=>`<div>${l}</div>`).join("")}</div>`:""}
+  </div>`;
+}
 function renderHome(){
   const today = todayKey();
   const pct = dayCompletionPct(today);
-  const dayTasks = state.tasks.filter(t=>t.date===today).sort((a,b)=> (a.time||"99:99").localeCompare(b.time||"99:99"));
+  const dayTasks = tasksForDate(today).sort((a,b)=> (a.time||"99:99").localeCompare(b.time||"99:99"));
   const waterVal = state.water.logs[today]||0;
   const moodToday = (state.mood.logs[today]||{}).value;
 
@@ -780,6 +912,8 @@ function renderHome(){
         <button class="btn-icon" id="customize-dash-btn" title="Customize dashboard">${icon("sliders-horizontal",17)}</button>
       </div>
     </div>
+
+    ${dayBriefHtml()}
 
     ${shouldNudgeInstall()? `
     <div class="card" style="margin-top:18px; border-color:var(--accent); background:var(--accent-soft);">
@@ -944,14 +1078,20 @@ function emptyState(iconName,title,body){
 }
 
 /* ---------- task row (shared) ---------- */
-function taskRowHtml(t){
+function taskRowHtml(t, dateKey){
+  /* callers may be .map(taskRowHtml), which passes the index as arg 2 */
+  const dk = (typeof dateKey === "string" && dateKey) ? dateKey : todayKey();
+  const done = taskDoneOn(t, dk);
   const prioClass = t.priority==="high"?"prio-high":t.priority==="med"?"prio-med":"prio-low";
+  const streak = taskRepeats(t) ? taskStreak(t, dk) : 0;
   return `<div class="item-row" data-task="${t.id}">
-    <div class="checkbox ${t.completed?'done':''}" data-toggle-task="${t.id}">${t.completed?icon("check",13):""}</div>
+    <div class="checkbox ${done?'done':''}" data-toggle-task="${t.id}" data-task-date="${dk}">${done?icon("check",13):""}</div>
     <div style="flex:1; min-width:0; cursor:pointer;" data-edit-task="${t.id}">
-      <div class="item-title ${t.completed?'done':''}">${escapeHtml(t.title)}</div>
+      <div class="item-title ${done?'done':''}">${escapeHtml(t.title)}</div>
       <div class="item-meta">
         ${t.time?`<span>${icon("clock",11)} ${fmtTime12(t.time)}</span>`:""}
+        ${taskRepeats(t)?`<span class="tag">${icon("repeat",11)} ${escapeHtml((REPEAT_OPTIONS.find(r=>r.id===t.repeat)||{}).short||"Repeats")}</span>`:""}
+        ${streak>0?`<span class="tag streak-tag">${icon("flame",11)} ${streak}</span>`:""}
         ${t.category?`<span class="tag">${escapeHtml(t.category)}</span>`:""}
         <span class="tag ${prioClass}">${t.priority}</span>
       </div>
@@ -962,8 +1102,13 @@ function taskRowHtml(t){
 function bindTaskRowEvents(root){
   root.querySelectorAll("[data-toggle-task]").forEach(el=> el.onclick = ()=>{
     const t = state.tasks.find(x=>x.id===el.dataset.toggleTask);
-    t.completed = !t.completed; save();
-    if(t.completed) toast("Task completed","check");
+    const dk = el.dataset.taskDate || todayKey();
+    const now = !taskDoneOn(t, dk);
+    setTaskDone(t, dk, now); save();
+    if(now){
+      const st = taskRepeats(t) ? taskStreak(t, dk) : 0;
+      toast(st>1 ? ("Task completed - "+st+" day streak") : "Task completed","check");
+    }
     rerenderCurrent();
   });
   root.querySelectorAll("[data-edit-task]").forEach(el=> el.onclick = ()=> openTaskModal(el.dataset.editTask));
@@ -1027,6 +1172,17 @@ function pomodoroWidgetHtml(){
     <div class="muted" style="font-size:11.5px; margin-top:8px; text-align:center;">Today's focus time: <span class="mono">${todayFocusMinutes()}m</span></div>
   `;
 }
+function creditFocusElapsed(){
+  const sec = ui.pomodoro.elapsedSec || 0;
+  ui.pomodoro.elapsedSec = 0;
+  if(ui.pomodoro.mode !== "focus") return 0;
+  const mins = Math.floor(sec/60);
+  if(mins > 0){
+    const dk = todayKey();
+    state.pomodoro.sessions[dk] = (state.pomodoro.sessions[dk]||0) + mins;
+  }
+  return mins;
+}
 function todayFocusMinutes(){
   const s = state.pomodoro.sessions[todayKey()] || 0; return s;
 }
@@ -1049,15 +1205,14 @@ function pomoStart(){
   ui.pomodoro.running = true;
   ui.pomodoro.interval = setInterval(()=>{
     ui.pomodoro.remaining--;
+    if(ui.pomodoro.mode === "focus") ui.pomodoro.elapsedSec = (ui.pomodoro.elapsedSec||0) + 1;
     if(ui.pomodoro.remaining<=0){
       pomoStop();
       if(ui.pomodoro.mode==="focus"){
-        const dk = todayKey();
-        const minutesRun = Math.round((ui.pomodoro.mode==="focus"?state.settings.pomodoroFocusMin:0));
-        state.pomodoro.sessions[dk] = (state.pomodoro.sessions[dk]||0) + minutesRun;
+        const minutesRun = creditFocusElapsed();
         if(ui.pomodoro.activeSessionId){
           const sess = state.focusSessions.find(s=>s.id===ui.pomodoro.activeSessionId);
-          if(sess) sess.completed = true;
+          if(sess){ sess.completed = true; sess.creditedMin = minutesRun; }
           ui.pomodoro.activeSessionId = null;
         }
         save();
@@ -1074,7 +1229,18 @@ function pomoStart(){
   }, 1000);
   refreshFullPomo();
 }
-function pomoStop(){ ui.pomodoro.running=false; clearInterval(ui.pomodoro.interval); refreshFullPomo(); }
+function pomoStop(){
+  ui.pomodoro.running=false; clearInterval(ui.pomodoro.interval);
+  const banked = creditFocusElapsed();
+  if(banked > 0){
+    if(ui.pomodoro.activeSessionId){
+      const sess = state.focusSessions.find(s=>s.id===ui.pomodoro.activeSessionId);
+      if(sess) sess.creditedMin = (sess.creditedMin||0) + banked;
+    }
+    save();
+  }
+  refreshFullPomo();
+}
 function refreshPomoDisplay(){
   const el = document.getElementById("pomo-display"); if(!el) return;
   const mm = String(Math.floor(ui.pomodoro.remaining/60)).padStart(2,"0");
@@ -1093,9 +1259,9 @@ function renderTasks(){
   const filter = ui.taskFilter || "today";
   const today = todayKey();
   let list = state.tasks.slice();
-  if(filter==="today") list = list.filter(t=>t.date===today);
-  else if(filter==="upcoming") list = list.filter(t=>t.date>today);
-  else if(filter==="completed") list = list.filter(t=>t.completed);
+  if(filter==="today") list = list.filter(t=>taskOccursOn(t,today));
+  else if(filter==="upcoming") list = list.filter(t=> taskRepeats(t) ? true : t.date>today);
+  else if(filter==="completed") list = list.filter(t=> taskRepeats(t) ? taskDoneOn(t,today) : t.completed);
   list.sort((a,b)=> (a.date+((a.time||"99:99"))).localeCompare(b.date+(b.time||"99:99")));
 
   root.innerHTML = `
@@ -1141,6 +1307,12 @@ function openTaskModal(taskId){
         <select id="tf-cat"><option value="">None</option>${catOptions}</select>
       </div>
     </div>
+    <div class="field"><label class="field-label">Repeat</label>
+      <select id="tf-repeat">
+        ${REPEAT_OPTIONS.map(r=>`<option value="${r.id}" ${((editing&&editing.repeat)||'none')===r.id?'selected':''}>${r.label}</option>`).join("")}
+      </select>
+      <div class="muted" style="font-size:11.5px; margin-top:5px;">Repeating tasks build a streak. The date above is when it starts.</div>
+    </div>
     <div class="field" style="display:flex; align-items:center; justify-content:space-between;">
       <label class="field-label" style="margin:0;">Reminder notification</label>
       <label class="switch"><input type="checkbox" id="tf-remind" ${editing&&editing.reminder?'checked':''}/><span class="slider"></span></label>
@@ -1160,9 +1332,14 @@ function openTaskModal(taskId){
       priority: document.getElementById("tf-prio").value,
       category: document.getElementById("tf-cat").value,
       reminder: document.getElementById("tf-remind").checked,
+      repeat: document.getElementById("tf-repeat").value,
     };
-    if(editing){ Object.assign(editing, data); toast("Task updated","check"); }
-    else{ state.tasks.push(Object.assign({id:uid(), completed:false}, data)); toast("Task added","plus"); }
+    if(editing){
+      Object.assign(editing, data);
+      if(data.repeat && data.repeat!=="none" && !editing.completions) editing.completions = {};
+      toast("Task updated","check");
+    }
+    else{ state.tasks.push(Object.assign({id:uid(), completed:false, completions:{}}, data)); toast("Task added","plus"); }
     save(); closeModal(); rerenderCurrent();
     if(data.reminder) ensureNotifPermission();
   };
@@ -1462,10 +1639,10 @@ function renderFocus(){
     </div>
   `;
   mountPomodoroWidget();
-  document.getElementById("focus-min-dec").onclick = ()=>adjustDuration("focus",-5);
-  document.getElementById("focus-min-inc").onclick = ()=>adjustDuration("focus",5);
-  document.getElementById("break-min-dec").onclick = ()=>adjustDuration("break",-5);
-  document.getElementById("break-min-inc").onclick = ()=>adjustDuration("break",5);
+  document.getElementById("focus-min-dec").onclick = ()=>adjustDuration("focus",-1);
+  document.getElementById("focus-min-inc").onclick = ()=>adjustDuration("focus",1);
+  document.getElementById("break-min-dec").onclick = ()=>adjustDuration("break",-1);
+  document.getElementById("break-min-inc").onclick = ()=>adjustDuration("break",1);
   document.getElementById("focus-min-input").onchange = e=>{ state.settings.pomodoroFocusMin = clamp(parseInt(e.target.value,10)||25,1,180); if(ui.pomodoro.mode==="focus") ui.pomodoro.remaining = state.settings.pomodoroFocusMin*60; save(); renderFocus(); };
   document.getElementById("break-min-input").onchange = e=>{ state.settings.pomodoroBreakMin = clamp(parseInt(e.target.value,10)||5,1,60); if(ui.pomodoro.mode==="break") ui.pomodoro.remaining = state.settings.pomodoroBreakMin*60; save(); renderFocus(); };
   document.getElementById("book-session-btn").onclick = ()=>openFocusSessionModal();
@@ -1503,7 +1680,18 @@ function minutesToTime(total){ total = ((total%1440)+1440)%1440; const h=Math.fl
 function bindFocusSessionEvents(root){
   root.querySelectorAll("[data-toggle-session]").forEach(b=> b.onclick = ()=>{
     const s = state.focusSessions.find(x=>x.id===b.dataset.toggleSession);
-    s.completed = !s.completed; save(); renderFocus();
+    s.completed = !s.completed;
+    const dk = s.date || todayKey();
+    if(s.completed){
+      if(!s.creditedMin){
+        s.creditedMin = s.duration||0;
+        state.pomodoro.sessions[dk] = (state.pomodoro.sessions[dk]||0) + s.creditedMin;
+      }
+    } else if(s.creditedMin){
+      state.pomodoro.sessions[dk] = Math.max(0,(state.pomodoro.sessions[dk]||0) - s.creditedMin);
+      s.creditedMin = 0;
+    }
+    save(); renderFocus();
   });
   root.querySelectorAll("[data-start-session]").forEach(b=> b.onclick = ()=>{
     const s = state.focusSessions.find(x=>x.id===b.dataset.startSession);
@@ -2948,13 +3136,18 @@ function renderCalendar(){
         <div class="cal-grid">
           ${cells.map(c=>{
             if(c.other) return `<div class="cal-cell other-month">${c.d}</div>`;
+            const isPast = c.key <= todayKey();
+            const pct = isPast ? dayCompletionPct(c.key) : 0;
+            const kept = isPast ? dayStreakKept(c.key) : null;
+            const fill = (isPast && pct>0) ? ' --cell-fill:'+(0.10 + (pct/100)*0.55).toFixed(2)+';' : '';
             const hasActivity = dayHasActivity(c.key);
             const cmk = cycMarks[c.key] || {};
             const cycStyle = cmk.period? ' style="background:var(--cyc-period-soft); color:var(--cyc-period);"'
                             : cmk.predPeriod? ' style="border-style:dashed; border-color:var(--cyc-period); color:var(--cyc-period);"'
                             : cmk.fertile? ' style="background:var(--cyc-fertile-soft); color:var(--cyc-fertile);"' : '';
-            return `<div class="cal-cell ${c.key===todayKey()?'today':''} ${c.key===sel?'selected':''}"${c.key===sel?'':cycStyle} data-daykey="${c.key}">
-              <span>${c.d}</span>${hasActivity?'<span class="cal-dot"></span>':''}
+            const styleAttr = c.key===sel ? '' : (cycStyle || (fill ? ' style="'+fill+'background:rgba(79,122,104,var(--cell-fill));"' : ''));
+            return `<div class="cal-cell ${c.key===todayKey()?'today':''} ${c.key===sel?'selected':''} ${kept===true?'kept':''}"${styleAttr} data-daykey="${c.key}">
+              <span>${c.d}</span>${kept===true?'<span class="cal-flame">'+icon("flame",10)+'</span>':(hasActivity?'<span class="cal-dot"></span>':'')}
             </div>`;
           }).join("")}
         </div>
@@ -2963,9 +3156,16 @@ function renderCalendar(){
           <span><i class="cyc-swatch" style="border:1px dashed var(--cyc-period);"></i> Predicted</span>
           <span><i class="cyc-swatch" style="background:var(--cyc-fertile);"></i> Fertile</span>
         </div>`:""}
+        <div class="cyc-legend" style="margin-top:12px;">
+          <span><i class="cyc-swatch" style="background:rgba(79,122,104,.55);"></i> More completed</span>
+          <span>${icon("flame",11)} Every repeat kept</span>
+        </div>
         <button class="btn btn-ghost" id="cal-today" style="width:100%; margin-top:14px;">${icon("calendar",15)} Jump to Today</button>
       </div>
-      <div id="cal-detail"></div>
+      <div>
+        ${streakPanelHtml()}
+        <div id="cal-detail"></div>
+      </div>
     </div>
   `;
   document.getElementById("cal-prev").onclick = ()=>{ ui.calMonth = new Date(year, month-1, 1); renderCalendar(); };
@@ -2975,9 +3175,35 @@ function renderCalendar(){
   renderCalDetail();
   mountIcons();
 }
+function streakPanelHtml(){
+  const reps = repeatingTasks();
+  const overall = overallStreak();
+  const last7 = lastNDays(7);
+  return `<div class="card" style="margin-bottom:16px;">
+    <div class="section-title" style="margin-top:0;"><h2>Streaks</h2></div>
+    <div class="card-tight" style="background:var(--bg-soft); border-radius:14px; margin-bottom:12px;">
+      <div class="muted" style="font-size:11.5px;">Every repeat kept</div>
+      <div class="display" style="font-size:26px;">${overall} ${overall===1?"day":"days"}</div>
+    </div>
+    ${reps.length ? reps.map(t=>{
+      const st = taskStreak(t);
+      const dots = last7.map(d=>{
+        if(!taskOccursOn(t,d)) return '<i class="sdot off" title="not due"></i>';
+        return taskDoneOn(t,d) ? '<i class="sdot on"></i>' : '<i class="sdot miss"></i>';
+      }).join("");
+      return `<div class="item-row" style="padding:9px 2px;">
+        <div style="flex:1; min-width:0;">
+          <div class="item-title" style="font-size:13.5px;">${escapeHtml(t.title)}</div>
+          <div class="streak-dots">${dots}</div>
+        </div>
+        <span class="tag streak-tag">${icon("flame",11)} ${st}</span>
+      </div>`;
+    }).join("") : emptyState("repeat","No repeating tasks yet","Set a task to repeat and its streak shows up here.")}
+  </div>`;
+}
 function dayHasActivity(key){
   if(!key) return false;
-  if(state.tasks.some(t=>t.date===key && t.completed)) return true;
+  if(tasksForDate(key).some(t=>taskDoneOn(t,key))) return true;
   if(state.habitLogs[key] && Object.values(state.habitLogs[key]).some(Boolean)) return true;
   if(state.water.logs[key]>0) return true;
   if(state.mood.logs[key]) return true;
@@ -2988,7 +3214,7 @@ function renderCalDetail(){
   const key = ui.calSelected;
   const el = document.getElementById("cal-detail");
   if(!el) return;
-  const dayTasks = state.tasks.filter(t=>t.date===key);
+  const dayTasks = tasksForDate(key);
   const habitsDone = state.habits.filter(h=>(state.habitLogs[key]||{})[h.id]);
   const mood = (state.mood.logs[key]||{}).value;
   const moodObj = MOODS.find(m=>m.v===mood);
@@ -2999,7 +3225,7 @@ function renderCalDetail(){
     <div class="card">
       <div style="font-family:'Fraunces',serif; font-weight:600; font-size:17px; margin-bottom:12px;">${fmtDateLong(key)}</div>
       <div class="grid grid-2" style="gap:10px; margin-bottom:14px;">
-        <div class="card-tight" style="background:var(--bg-soft); border-radius:14px;"><div class="muted" style="font-size:11px;">Tasks done</div><div class="mono" style="font-weight:700; font-size:16px;">${dayTasks.filter(t=>t.completed).length}/${dayTasks.length}</div></div>
+        <div class="card-tight" style="background:var(--bg-soft); border-radius:14px;"><div class="muted" style="font-size:11px;">Tasks done</div><div class="mono" style="font-weight:700; font-size:16px;">${dayTasks.filter(t=>taskDoneOn(t,key)).length}/${dayTasks.length}</div></div>
         <div class="card-tight" style="background:var(--bg-soft); border-radius:14px;"><div class="muted" style="font-size:11px;">Habits done</div><div class="mono" style="font-weight:700; font-size:16px;">${habitsDone.length}/${state.habits.length}</div></div>
         <div class="card-tight" style="background:var(--bg-soft); border-radius:14px;"><div class="muted" style="font-size:11px;">Water</div><div class="mono" style="font-weight:700; font-size:16px;">${water}ml</div></div>
         <div class="card-tight" style="background:var(--bg-soft); border-radius:14px;"><div class="muted" style="font-size:11px;">Focus time</div><div class="mono" style="font-weight:700; font-size:16px;">${focusMin}m</div></div>
@@ -3011,7 +3237,7 @@ function renderCalDetail(){
       })() : ""}
       <hr class="hair"/>
       <div style="font-weight:700; font-size:13.5px; margin-bottom:6px;">Tasks</div>
-      ${dayTasks.length? dayTasks.map(t=>`<div class="item-row" style="padding:8px 2px;"><div class="checkbox ${t.completed?'done':''}" style="width:19px;height:19px;">${t.completed?icon('check',11):''}</div><div class="item-title ${t.completed?'done':''}" style="font-size:13px;">${escapeHtml(t.title)}</div></div>`).join(""):'<div class="muted" style="font-size:13px;">No tasks that day.</div>'}
+      ${dayTasks.length? dayTasks.map(t=>`<div class="item-row" style="padding:8px 2px;"><div class="checkbox ${taskDoneOn(t,key)?'done':''}" style="width:19px;height:19px;">${taskDoneOn(t,key)?icon('check',11):''}</div><div class="item-title ${taskDoneOn(t,key)?'done':''}" style="font-size:13px;">${escapeHtml(t.title)}</div></div>`).join(""):'<div class="muted" style="font-size:13px;">No tasks that day.</div>'}
     </div>
     ${state.reflections[key] || key<=todayKey() ? `<div style="margin-top:16px;"><div class="section-title" style="margin-top:0;"><h2 style="font-size:16px;">Reflection</h2></div>${reflectionCardHtml(key)}</div>`:''}
   `;
@@ -3943,7 +4169,7 @@ function openOnboardingModal(){
     const goalTitle = document.getElementById("ob-goal").value.trim();
     if(goalTitle) state.goals.push({id:uid(), title:goalTitle, type:"personal", deadline:"", status:"active", progress:0, topics:[], createdAt:todayKey()});
     const taskTitle = document.getElementById("ob-task").value.trim();
-    if(taskTitle) state.tasks.push({id:uid(), title:taskTitle, description:"", date:todayKey(), time:"", priority:"med", category:"", completed:false});
+    if(taskTitle) state.tasks.push({id:uid(), title:taskTitle, description:"", date:todayKey(), time:"", priority:"med", category:"", completed:false, repeat:"none", completions:{}});
     const medName = document.getElementById("ob-med").value.trim();
     if(medName) state.medicines.push({id:uid(), name:medName, dosage:"", time:""});
     finish();
@@ -4012,7 +4238,7 @@ function collectNativeReminders(days){
     const dk = addDays(todayKey(), dOff);
 
     if(s.notifTasks){
-      state.tasks.filter(t=>t.reminder && !t.completed && t.date===dk && t.time).forEach(t=>{
+      state.tasks.filter(t=>t.reminder && t.time && taskOccursOn(t,dk) && !taskDoneOn(t,dk)).forEach(t=>{
         push("task-"+t.id+"-"+dk, "Task reminder", t.title, atLocal(dk, t.time));
       });
     }
@@ -4121,7 +4347,7 @@ function checkReminders(){
   const hhmm = String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
   const today = todayKey();
   if(state.settings.notifTasks){
-    state.tasks.filter(t=>t.reminder && !t.completed && t.date===today && t.time).forEach(t=>{
+    state.tasks.filter(t=>t.reminder && t.time && taskOccursOn(t,today) && !taskDoneOn(t,today)).forEach(t=>{
       const key = "task-"+t.id+"-"+today;
       if(!firedReminders.has(key) && hhmm>=t.time){
         firedReminders.add(key);
