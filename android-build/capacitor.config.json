@@ -1,0 +1,14 @@
+{
+  "appId": "io.github.gauravvdev.daybook",
+  "appName": "My Day Buddy",
+  "webDir": "www",
+  "android": {
+    "allowMixedContent": false
+  },
+  "plugins": {
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_daybook",
+      "iconColor": "#4F7A68"
+    }
+  }
+}
