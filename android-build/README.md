@@ -1,11 +1,11 @@
-# android-build — how My Day Buddy becomes an Android app
+# android-build: how My Day Buddy becomes an Android app
 
 The web app in the repo root is the whole product. This folder is only the
 shell that wraps it for Google Play, and the pieces that shell needs.
 
 **The generated `android/` project is deliberately not committed.** It is
 hundreds of files that `npx cap add android` recreates exactly, and the one
-thing it *doesn't* recreate — the icons and the app name — is what this
+thing it *doesn't* recreate, the icons and the app name, is what this
 folder holds.
 
 ---
@@ -36,9 +36,9 @@ Then, and this part is not optional:
 4. Set `versionCode` in `android/app/build.gradle` to one higher than the
    last uploaded build
 
-**Why steps 1–3 exist:** `cap add android` fills `mipmap-*` with Capacitor's
+**Why steps 1 to 3 exist:** `cap add android` fills `mipmap-*` with Capacitor's
 own placeholder launcher icon. It does not read the web manifest. Skip this
-and you ship a generic icon — this nearly happened on versionCode 2.
+and you ship a generic icon. This nearly happened on versionCode 2.
 
 ---
 
@@ -52,8 +52,8 @@ to `android/app/src/main/AndroidManifest.xml`:
 <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
 ```
 
-Without it Android downgrades reminders to inexact alarms, which drift 10–15
-minutes on a sleeping phone — the exact symptom the Capacitor build exists to
+Without it Android downgrades reminders to inexact alarms, which drift 10 to 15
+minutes on a sleeping phone, the exact symptom the Capacitor build exists to
 fix.
 
 **Never add `USE_EXACT_ALARM`.** That one is restricted by Play to alarm-clock
@@ -79,7 +79,7 @@ Moving 7 → 8 raised minSdk from 23 to 24, which drops ~1,000 older device
 models. Play blocks the release over this and you accept it with "Proceed
 anyway". Expect the same prompt every year.
 
-Decline every upgrade Android Studio offers mid-release — AGP, Kotlin, the
+Decline every upgrade Android Studio offers mid-release: AGP, Kotlin, the
 Gradle daemon toolchain. Capacitor 8 pins AGP 8.13.0 and Kotlin 2.2.20.
 
 ---
@@ -116,7 +116,7 @@ existing user's data.
   with `Unexpected character: '"'` on line 1 of a file that looks perfectly
   fine in the editor. Use
   `[IO.File]::WriteAllText($p, $t, (New-Object System.Text.UTF8Encoding $false))`.
-- **`npx` is blocked by the default execution policy** — use `npx.cmd`.
+- **`npx` is blocked by the default execution policy**, so use `npx.cmd`.
 - **Android Studio's SDK Manager lists `36.0`, `36.1` and `36.0-ext*` together.**
   `compileSdk 36` resolves to `platforms/android-36` only. Install the row
   reading API Level `36.0`, Revision `2`.
