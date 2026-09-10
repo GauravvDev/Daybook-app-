@@ -12,17 +12,17 @@ Turns out it grew into a full daily companion. Track your day, understand yourse
 
 **Tasks & Habits :** The basics, done well priorities, categories, and streaks that make you not want to break the chain.
 
-**Goals  :** For the bigger stuff. A project at work, an exam you're prepping for — break it into topics, check them off, watch the progress bar move instead of just hoping you're on track.
+**Goals  :** For the bigger stuff. A project at work, an exam you're prepping for. Break it into topics, check them off, watch the progress bar move instead of just hoping you're on track.
 
-**Focus :** A Pomodoro timer, but you can also book actual time slots ahead of time — "Study 4-6pm" — so your day has some shape to it.
+**Focus :** A Pomodoro timer, but you can also book actual time slots ahead of time, such as "Study 4 to 6pm", so your day has some shape to it.
 
 **Journal :** This one's just for you. Write whatever, attach a photo or a voice note if text doesn't cut it that day. Lock it with a PIN or your face/fingerprint if it's on a shared device.
 
-When you want it out of the app, **Export book** turns any stretch of your journal into a single self-contained HTML file — writing, photos and playable voice notes all baked in, laid out like a printed book. Send it to someone, keep it as a backup, or hit print inside it for a PDF.
+When you want it out of the app, **Export book** turns any stretch of your journal into a single self-contained HTML file, with writing, photos and playable voice notes all baked in, laid out like a printed book. Send it to someone, keep it as a backup, or hit print inside it for a PDF.
 
-**Health :** Water, sleep, mood, workouts, meds — the stuff that's easy to forget to log but matters most.
+**Health :** Water, sleep, mood, workouts, meds. The stuff that's easy to forget to log but matters most.
 
-**Cycle :** Optional, and off unless you turn it on. Period logging with flow and symptoms, mood and PMS notes, a colour-coded calendar, and next-period / fertile-window estimates that learn from your own averages. Same rule as everything else here — it stays on your device.
+**Cycle :** Optional, and off unless you turn it on. Period logging with flow and symptoms, mood and PMS notes, a colour-coded calendar, and next-period / fertile-window estimates that learn from your own averages. Same rule as everything else here: it stays on your device.
 
 **Insights :** A weekly report that actually tells you something, not just a wall of numbers.
 
@@ -32,7 +32,7 @@ When you want it out of the app, **Export book** turns any stretch of your journ
 
 There's no sign-up. No ads. Nothing gets sent anywhere it all just lives on your device, and it installs like a real app on your phone. I wanted something private, not another service quietly collecting my mood logs.
 
-**Your data, plainly :** No sign-up, no server, no analytics, no ads. Everything is written to your browser's own storage on your own device — which also means it doesn't sync between devices, and clearing your browsing data clears it. There's a one-tap JSON export for backups, and the app asks your browser to protect its storage from automatic cleanup. Terms of Use, Privacy Policy and a Health Disclaimer live in Settings → About & Legal.
+**Your data, plainly :** No sign-up, no server, no analytics, no ads. Everything is written to your browser's own storage on your own device, which also means it doesn't sync between devices, and clearing your browsing data clears it. There's a one-tap JSON export for backups, and the app asks your browser to protect its storage from automatic cleanup. Terms of Use, Privacy Policy and a Health Disclaimer live in Settings → About & Legal.
 
 ## Run it yourself
 
