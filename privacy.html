@@ -56,7 +56,7 @@
 <header>
   <div class="brand"><div class="mark"></div><span>My Day Buddy</span></div>
   <h1>Privacy Policy</h1>
-  <p class="updated">Last updated 1 September 2026</p>
+  <p class="updated">Last updated 12 October 2026</p>
 </header>
 
 <div class="summary">
@@ -64,7 +64,7 @@
 </div>
 
 <h2>What My Day Buddy stores, and where</h2>
-<p>All of your entries (tasks, habits, goals, focus sessions, journal text, mood, health logs and menstrual cycle data) are written to <strong>localStorage</strong> in the browser or app on the device you are using. Journal photos and voice notes are stored in <strong>IndexedDB</strong> on the same device. None of it is transmitted anywhere.</p>
+<p>All of your entries (tasks, habits, goals, focus sessions, journal text and energy check-ins) are written to <strong>localStorage</strong> in the browser or app on the device you are using. Journal photos and voice notes are stored in <strong>IndexedDB</strong> on the same device. None of it is transmitted anywhere.</p>
 <p>Because the data is tied to one app on one device, it does not sync between your phone and your computer, and it is erased if you clear the app's data, use a private browsing window, or uninstall the app.</p>
 
 <h2>What is never collected</h2>
@@ -75,18 +75,12 @@
   <li>No selling or sharing of data with third parties, because no data reaches the developer in the first place.</li>
 </ul>
 
-<h2>Third parties that see a network request</h2>
-<p>My Day Buddy is built with web technology, so opening it involves ordinary web requests for the app's own files. These parties can see your IP address and that a file was requested, but never your entries:</p>
-<ul>
-  <li><strong>GitHub Pages</strong>, which hosts the app's files. The installed Android app carries its own copy and does not contact it.</li>
-  <li><strong>Google Fonts</strong> (fonts.googleapis.com, fonts.gstatic.com), which supplies the typefaces.</li>
-  <li><strong>unpkg</strong>, which supplies the icon library.</li>
-</ul>
-<p>Once loaded, the app works fully offline and makes no further requests.</p>
+<h2>Network requests</h2>
+<p><strong>The Android app makes no network requests at all.</strong> It carries its own copy of the app files, typefaces and icons, and works fully offline.</p>
+<p>The web version at gauravvdev.github.io is loaded from <strong>GitHub Pages</strong>, which can see your IP address and that a file was requested, but never your entries. Nothing else is contacted.</p>
 
 <h2>Sensitive categories</h2>
-<p>My Day Buddy lets you record health-related information, including mood, sleep, medicines and, if you turn it on, menstrual cycle data. This is treated exactly like every other entry: written to your device only, never uploaded, never analysed by anyone but you. Menstrual cycle tracking is <strong>off by default</strong> and can be switched off at any time in Settings.</p>
-<p>My Day Buddy is not a medical device and does not diagnose, treat, cure or prevent any medical condition. Cycle predictions are estimates calculated from your own logged data. They are not a contraceptive method. Please consult a qualified healthcare professional for medical advice.</p>
+<p>Earlier versions of My Day Buddy could record health, water, medicine and menstrual cycle entries. Those trackers have been removed. Any entries you made before stay only on your device and in backups you export yourself. They are never uploaded.</p>
 
 <h2>Permissions the app may ask for</h2>
 <p>All are optional, and My Day Buddy works without any of them. Each is requested only at the moment a feature needs it, and can be withdrawn at any time in your device or browser settings.</p>
