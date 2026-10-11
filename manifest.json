@@ -1,18 +1,17 @@
 {
   "id": "/Daybook-app-/index.html",
-  "name": "My Day Buddy: Routine Tracker",
+  "name": "My Day Buddy: Calm Planner",
   "short_name": "Day Buddy",
-  "description": "Track your day. Build your routine. Everything stays on your phone.",
+  "description": "Plan your day with the Eisenhower Matrix, focus deeply, and build habits that stick. Everything stays on your device.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
-  "background_color": "#F5F3EE",
-  "theme_color": "#4F7A68",
+  "background_color": "#F6F3EC",
+  "theme_color": "#2F4EB8",
   "orientation": "portrait-primary",
   "categories": [
-    "health",
-    "lifestyle",
-    "productivity"
+    "productivity",
+    "lifestyle"
   ],
   "icons": [
     {
