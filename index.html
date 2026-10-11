@@ -2,9 +2,13 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
+<!-- Content Security Policy. The app is local-only, so nothing may talk to a
+     server we did not name here. Keeps a tampered CDN or an injected string
+     from loading code or phoning home with a journal. -->
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'; font-src 'self' data:; img-src 'self' data: blob:; media-src 'self' data: blob:; connect-src 'self' data: blob:; worker-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <title>My Day Buddy: Track your day. Understand yourself.</title>
-<meta name="description" content="A calm personal command center for tasks, habits, health and reflection." />
+<meta name="description" content="Plan your day with the Eisenhower Matrix, focus deeply, and build habits that stick." />
 <meta name="theme-color" content="#4F7A68" />
 <link rel="manifest" href="manifest.json" />
 <link rel="icon" href="icon.svg" type="image/svg+xml" />
@@ -16,26 +20,48 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-title" content="My Day Buddy" />
 <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<!-- Fonts are served from this app. They used to come from Google on every
+     launch, which meant the "nothing leaves your device" promise had an
+     asterisk on it and a cold start was never really offline. The files live
+     in fonts/ and are fetched once by fetch-fonts.js at build time. -->
+<link rel="stylesheet" href="fonts/fonts.css">
+<!-- v2.0.2: the icon set ships inside the app (icons.js), so nothing is fetched from the internet. -->
+<script src="icons.js"></script>
 <style>
 :root{
-  --bg:#F5F3EE; --bg-soft:#ECE7DC; --card:#FFFFFF; --card-2:#FBFAF7;
-  --ink:#23262B; --ink-soft:#6B6F76; --ink-faint:#9A9EA3;
-  --border:#E5E0D3; --accent:#4F7A68; --accent-ink:#ffffff;
-  --accent-soft:#E3EEE7; --clay:#D98E73; --clay-soft:#F7E7DE;
+  --bg:#F6F3EC; --bg-soft:#EEEAE1; --card:#FFFFFF; --card-2:#FBFAF6;
+  --ink:#1E2230; --ink-soft:#5F6472; --ink-faint:#8A8F99;
+  --border:#E4DFD4; --accent:#2F4EB8; --accent-ink:#ffffff;
+  --accent-soft:#E6EBF8; --clay:#D98E73; --clay-soft:#F7E7DE;
   --danger:#C1543C; --danger-soft:#F8E3DD; --gold:#C99A3E;
   --cyc-period:#C2536B; --cyc-period-soft:#F8E1E7; --cyc-fertile:#4F8FA6; --cyc-fertile-soft:#E2EEF3;
   --radius-lg:22px; --radius-md:16px; --radius-sm:10px;
   --shadow: 0 1px 2px rgba(35,38,43,.04), 0 8px 24px -12px rgba(35,38,43,.12);
   --shadow-lift: 0 2px 6px rgba(35,38,43,.06), 0 16px 40px -16px rgba(35,38,43,.22);
+
+  /* One spacing scale. Every gap and pad picks from here, so the rhythm holds
+     together instead of each screen choosing its own numbers. */
+  --s1:4px; --s2:8px; --s3:12px; --s4:16px; --s5:22px; --s6:30px; --s7:42px;
+
+  /* Type sizes interpolate with the viewport rather than stepping at a
+     breakpoint, so a 320px phone and a 1440px desktop both get a sensible
+     size and everything between is covered too. */
+  --t-xs:  clamp(11px, .40rem + .45vw, 12.5px);
+  --t-sm:  clamp(12.5px, .48rem + .5vw, 14px);
+  --t-md:  clamp(14px, .55rem + .55vw, 15.5px);
+  --t-lg:  clamp(16.5px, .62rem + .8vw, 19px);
+  --t-xl:  clamp(21px, .70rem + 1.6vw, 28px);
+  --t-2xl: clamp(26px, .80rem + 2.6vw, 40px);
+
+  /* Every control is at least this tall, so nothing needs a careful aim. */
+  --tap:44px;
   color-scheme: light;
 }
 [data-theme="dark"]{
   --bg:#15171A; --bg-soft:#1B1E22; --card:#1E2126; --card-2:#20242A;
-  --ink:#ECEDEE; --ink-soft:#9BA1A8; --ink-faint:#6B7078;
+  /* --ink-faint was #6B7078 on a #1E2126 card: about 2.6:1, under the 4.5:1
+     that small text needs. Both muted tones lifted until they pass. */
+  --ink:#ECEDEE; --ink-soft:#AFB5BC; --ink-faint:#8B9199;
   --border:#2B2F35; --accent:#6EA88F; --accent-ink:#0F1512;
   --accent-soft:rgba(110,168,143,.16); --clay:#E2A183; --clay-soft:rgba(226,161,131,.14);
   --danger:#E17A63; --danger-soft:rgba(225,122,99,.14); --gold:#D9B15C;
@@ -46,6 +72,7 @@
 }
 *{box-sizing:border-box;}
 html,body{margin:0;padding:0;}
+html{background:var(--bg);}
 body{
   background:var(--bg); color:var(--ink);
   font-family:'Inter',system-ui,sans-serif;
@@ -54,18 +81,30 @@ body{
   transition:background .25s ease,color .25s ease;
 }
 h1,h2,h3,.display{font-family:'Fraunces',serif; font-weight:600; letter-spacing:-.01em;}
+/* Anything a person can type may be one unbroken string - a long URL, a pasted
+   token, a word held down. Without this it refuses to wrap, pushes past the
+   viewport and the whole page scrolls sideways. */
+h1,h2,h3,p,li,td,th,.brief-head,.item-title,.ll-sub,.qtext,.entry-body,.tag,.modal,.card,.hero{overflow-wrap:break-word;}
 .mono{font-family:'JetBrains Mono',monospace;}
 button{font-family:inherit;}
 a{color:inherit;}
 ::selection{background:var(--accent-soft);}
 :focus-visible{outline:2px solid var(--accent); outline-offset:2px; border-radius:6px;}
-@media (prefers-reduced-motion: reduce){ *{animation-duration:.001ms !important; transition-duration:.001ms !important;} }
+/* One easing curve for everything that moves, so the app feels like one piece
+   rather than a dozen components each with their own idea of timing. */
+:root{ --ease:cubic-bezier(.2,.8,.3,1); --fast:.14s; --slow:.24s; }
+.btn:active, .btn-icon:active, .chip:active, .bn-item:active{ transform:scale(.97); }
+.card{ transition:box-shadow var(--slow) var(--ease), border-color var(--slow) var(--ease); }
+.linkline, .nav-item, .chip, .mood-opt, .checkbox{ transition:background var(--fast) var(--ease), color var(--fast) var(--ease), border-color var(--fast) var(--ease); }
+/* Someone who has asked their device for less motion gets none of it. */
+@media (prefers-reduced-motion: reduce){ *{animation-duration:.001ms !important; transition-duration:.001ms !important;} .btn:active,.btn-icon:active,.chip:active,.bn-item:active{transform:none;} }
 
 /* ---------- shell ---------- */
 #shell{display:flex; min-height:100vh;}
 #sidebar{
   width:236px; flex-shrink:0; background:var(--bg-soft); border-right:1px solid var(--border);
-  padding:24px 16px; display:flex; flex-direction:column; gap:3px; position:sticky; top:0; height:100vh; overflow-y:auto;
+  padding:calc(24px + env(safe-area-inset-top,0px)) 16px 24px calc(16px + env(safe-area-inset-left,0px));
+  display:flex; flex-direction:column; gap:3px; position:sticky; top:0; height:100vh; overflow-y:auto;
 }
 .brand{display:flex; align-items:center; gap:10px; padding:6px 10px 22px;}
 .cal-cell.kept{box-shadow:inset 0 0 0 1.5px var(--accent);}
@@ -96,20 +135,28 @@ a{color:inherit;}
 
 #main{flex:1; min-width:0; display:flex; flex-direction:column;}
 #topbar{display:none;}
-#view-root{padding:28px 34px 100px; max-width:1180px; width:100%; margin:0 auto;}
+#view-root{
+  padding:calc(var(--s6) + env(safe-area-inset-top,0px)) calc(var(--s6) + env(safe-area-inset-right,0px)) calc(100px + env(safe-area-inset-bottom,0px)) calc(var(--s6) + env(safe-area-inset-left,0px));
+  max-width:1180px; width:100%; margin:0 auto;
+}
 
 /* ---------- cards / generic ---------- */
-.card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px; box-shadow:var(--shadow);}
-.card-tight{padding:16px;}
-.grid{display:grid; gap:16px;}
-.section-title{display:flex; align-items:center; justify-content:space-between; margin:28px 0 12px;}
-.section-title h2{font-size:19px; margin:0;}
+.card{background:var(--card); border:1px solid var(--border); border-radius:var(--radius-lg); padding:var(--s5); box-shadow:var(--shadow);}
+.card-tight{padding:var(--s4);}
+.grid{display:grid; gap:var(--s4);}
+.section-title{display:flex; align-items:center; justify-content:space-between; gap:var(--s3); margin:var(--s7) 0 var(--s3);}
+.section-title h2{font-size:var(--t-lg); margin:0;}
 .muted{color:var(--ink-soft);}
 .pill{display:inline-flex;align-items:center;gap:5px;font-size:12px;font-weight:600;padding:4px 10px;border-radius:999px;background:var(--accent-soft);color:var(--accent);}
 .btn{
+  /* A short label on a control should sit on one line. Left to wrap it turns
+     "+250ml" into three stacked fragments in a narrow card. */
+  white-space:nowrap;
   display:inline-flex; align-items:center; gap:7px; justify-content:center;
-  padding:10px 16px; border-radius:12px; border:1px solid transparent; cursor:pointer; font-weight:600; font-size:14px;
-  transition:transform .12s ease, box-shadow .12s ease, background .15s ease, opacity .15s;
+  min-height:var(--tap);
+  padding:10px var(--s4); border-radius:12px; border:1px solid transparent; cursor:pointer; font-weight:600; font-size:var(--t-sm);
+  transition:transform .12s cubic-bezier(.2,.8,.3,1), box-shadow .15s ease, background .15s ease, opacity .15s;
+  -webkit-tap-highlight-color:transparent;
 }
 .btn:active{transform:scale(.97);}
 .btn-primary{background:var(--accent); color:var(--accent-ink);}
@@ -118,10 +165,10 @@ a{color:inherit;}
 .btn-ghost:hover{background:var(--bg-soft);}
 .btn-soft{background:var(--accent-soft); color:var(--accent);}
 .btn-danger{background:var(--danger-soft); color:var(--danger);}
-.btn-icon{width:36px;height:36px;padding:0;border-radius:10px;background:transparent;color:var(--ink-soft);border:1px solid var(--border);}
+.btn-icon{width:var(--tap);height:var(--tap);min-height:var(--tap);padding:0;border-radius:12px;background:transparent;color:var(--ink-soft);border:1px solid var(--border);flex-shrink:0;}
 .btn-icon:hover{background:var(--bg-soft); color:var(--ink);}
 .btn[disabled]{opacity:.5; cursor:not-allowed;}
-.icon-btn-plain{background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:6px;border-radius:8px;display:flex;}
+.icon-btn-plain{background:none;border:none;cursor:pointer;color:var(--ink-soft);padding:var(--s3);border-radius:10px;display:flex;align-items:center;justify-content:center;min-width:var(--tap);min-height:var(--tap);flex-shrink:0;-webkit-tap-highlight-color:transparent;}
 .icon-btn-plain:hover{background:var(--bg-soft); color:var(--ink);}
 input[type=text],input[type=number],input[type=date],input[type=time],textarea,select{
   width:100%; padding:10px 12px; border-radius:11px; border:1px solid var(--border); background:var(--card-2); color:var(--ink);
@@ -131,7 +178,8 @@ input:focus,textarea:focus,select:focus{border-color:var(--accent);}
 textarea{resize:vertical; min-height:64px;}
 label.field-label{font-size:12.5px; font-weight:600; color:var(--ink-soft); margin-bottom:6px; display:block;}
 .field{margin-bottom:14px;}
-.row{display:flex; gap:10px;}
+.row{display:flex; gap:var(--s3); flex-wrap:wrap;}
+.row > .btn{flex:1 1 auto; min-width:0;}
 .row > *{flex:1;}
 hr.hair{border:none;border-top:1px solid var(--border); margin:14px 0;}
 
@@ -148,9 +196,9 @@ hr.hair{border:none;border-top:1px solid var(--border); margin:14px 0;}
 .bar > span{display:block; height:100%; background:var(--accent); border-radius:99px; transition:width .5s ease;}
 
 /* hero / greeting */
-.hero{display:flex; justify-content:space-between; align-items:flex-start; gap:20px; flex-wrap:wrap;}
+.hero{display:flex; justify-content:space-between; align-items:flex-start; gap:var(--s5); flex-wrap:wrap; margin-bottom:var(--s2);}
 .hero h1{font-size:30px; margin:0 0 4px;}
-.hero .sub{color:var(--ink-soft); font-size:14.5px;}
+.hero .sub{color:var(--ink-soft); font-size:var(--t-md); margin-top:var(--s1);}
 
 .quote-card{background:linear-gradient(155deg,var(--accent-soft),var(--card)); border:1px solid var(--border); border-radius:var(--radius-lg); padding:20px 22px; position:relative;}
 .quote-card p.qtext{font-family:'Fraunces',serif; font-size:18px; line-height:1.5; margin:0 0 8px; font-style:italic;}
@@ -160,11 +208,11 @@ hr.hair{border:none;border-top:1px solid var(--border); margin:14px 0;}
 .item-row{display:flex; align-items:center; gap:12px; padding:12px 6px; border-bottom:1px solid var(--border);}
 .item-row:last-child{border-bottom:none;}
 .checkbox{
-  width:23px; height:23px; border-radius:8px; border:2px solid var(--border); flex-shrink:0; cursor:pointer;
+  width:28px; height:28px; border-radius:9px; border:2px solid var(--border); flex-shrink:0; cursor:pointer;
   display:flex; align-items:center; justify-content:center; transition:all .15s ease; background:var(--card-2);
 }
 .checkbox.done{background:var(--accent); border-color:var(--accent); color:var(--accent-ink);}
-.checkbox svg{width:14px;height:14px;}
+.checkbox svg{width:16px;height:16px;}
 .item-title{font-weight:600; font-size:14.5px;}
 .item-title.done{text-decoration:line-through; color:var(--ink-soft); font-weight:500;}
 .item-meta{font-size:12px; color:var(--ink-soft); display:flex; gap:8px; margin-top:2px; flex-wrap:wrap;}
@@ -188,15 +236,15 @@ hr.hair{border:none;border-top:1px solid var(--border); margin:14px 0;}
 .overlay{position:fixed; inset:0; background:rgba(20,22,25,.45); backdrop-filter:blur(2px); display:flex; align-items:flex-end; justify-content:center; z-index:100; opacity:0; pointer-events:none; transition:opacity .2s ease;}
 .overlay.open{opacity:1; pointer-events:auto;}
 @media(min-width:720px){.overlay{align-items:center;}}
-.modal{background:var(--card); width:100%; max-width:480px; border-radius:22px 22px 0 0; padding:22px; max-height:88vh; overflow-y:auto; transform:translateY(16px); transition:transform .22s cubic-bezier(.2,.8,.3,1); box-shadow:var(--shadow-lift);}
+.modal{background:var(--card); width:100%; max-width:480px; border-radius:22px 22px 0 0; padding:22px 22px calc(22px + env(safe-area-inset-bottom,0px)); max-height:88vh; overflow-y:auto; transform:translateY(16px); transition:transform .22s cubic-bezier(.2,.8,.3,1); box-shadow:var(--shadow-lift);}
 .overlay.open .modal{transform:translateY(0);}
 @media(min-width:720px){.modal{border-radius:22px; margin-bottom:0;}}
 .modal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;}
 .modal-head h3{margin:0; font-size:19px;}
 
 /* toasts */
-#toast-root{position:fixed; top:18px; right:18px; z-index:200; display:flex; flex-direction:column; gap:8px; max-width:320px;}
-@media(max-width:719px){#toast-root{left:12px; right:12px; top:12px; max-width:none;}}
+#toast-root{position:fixed; top:calc(18px + env(safe-area-inset-top,0px)); right:calc(18px + env(safe-area-inset-right,0px)); z-index:200; display:flex; flex-direction:column; gap:8px; max-width:320px;}
+@media(max-width:719px){#toast-root{left:calc(12px + env(safe-area-inset-left,0px)); right:calc(12px + env(safe-area-inset-right,0px)); top:calc(12px + env(safe-area-inset-top,0px)); max-width:none;}}
 .toast{background:var(--ink); color:var(--bg); padding:12px 16px; border-radius:12px; font-size:13.5px; font-weight:500; box-shadow:var(--shadow-lift); display:flex; align-items:center; gap:10px; animation:toastIn .25s ease;}
 [data-theme="dark"] .toast{background:var(--card); color:var(--ink); border:1px solid var(--border);}
 @keyframes toastIn{from{opacity:0; transform:translateY(-8px);} to{opacity:1; transform:translateY(0);}}
@@ -205,21 +253,30 @@ hr.hair{border:none;border-top:1px solid var(--border); margin:14px 0;}
 #bottomnav{display:none;}
 @media(max-width:900px){
   #sidebar{display:none;}
-  #view-root{padding:18px 16px 90px;}
+  #view-root{padding:var(--s4) calc(var(--s4) + env(safe-area-inset-right,0px)) calc(96px + env(safe-area-inset-bottom,0px)) calc(var(--s4) + env(safe-area-inset-left,0px));}
   #bottomnav{
     display:flex; position:fixed; bottom:0; left:0; right:0; background:var(--card); border-top:1px solid var(--border);
-    padding:8px 6px calc(8px + env(safe-area-inset-bottom)); z-index:80; justify-content:space-around;
+    padding:8px calc(6px + env(safe-area-inset-right,0px)) calc(8px + env(safe-area-inset-bottom,0px)) calc(6px + env(safe-area-inset-left,0px)); z-index:80; justify-content:space-around;
   }
-  .bn-item{display:flex; flex-direction:column; align-items:center; gap:3px; background:none; border:none; color:var(--ink-soft); font-size:10.5px; font-weight:600; padding:4px 8px; border-radius:10px;}
+  .bn-item{display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; min-height:var(--tap); flex:1; min-width:0; background:none; border:none; color:var(--ink-soft); font-size:var(--t-xs); font-weight:600; padding:var(--s1) var(--s2); border-radius:12px; -webkit-tap-highlight-color:transparent;}
   .bn-item.active{color:var(--accent);}
   .bn-item svg{width:21px;height:21px;}
-  #topbar{display:flex; align-items:center; justify-content:space-between; padding:14px 16px; position:sticky; top:0; background:var(--bg); z-index:50; border-bottom:1px solid var(--border);}
+  /* Android 15 and iOS draw the app behind the status bar / notch, so the
+     top bar has to hold that height itself or the theme button ends up
+     underneath the clock and battery icons and cannot be tapped. */
+  #topbar{display:flex; align-items:center; justify-content:space-between;
+    padding:calc(14px + env(safe-area-inset-top,0px)) calc(16px + env(safe-area-inset-right,0px)) 14px calc(16px + env(safe-area-inset-left,0px));
+    position:sticky; top:0; background:var(--bg); z-index:50; border-bottom:1px solid var(--border);}
 }
 
-.grid-2{grid-template-columns:repeat(2,1fr);}
-.grid-3{grid-template-columns:repeat(3,1fr);}
-@media(min-width:760px){ .cols-2{display:grid; grid-template-columns:1.3fr 1fr; gap:18px; align-items:start;} }
-@media(max-width:759px){ .grid-2{grid-template-columns:1fr 1fr;} .grid-3{grid-template-columns:1fr 1fr;} }
+/* The card says how narrow it can get; the browser fits as many as will go.
+   repeat(2,1fr) forced two columns at every width, which is how a phone ended
+   up with cards too narrow to hold the word "goal". No breakpoint involved:
+   this is correct at 280px and at 2000px and everywhere between. */
+.grid-2{grid-template-columns:repeat(auto-fit, minmax(min(210px, 100%), 1fr));}
+.grid-3{grid-template-columns:repeat(auto-fit, minmax(min(150px, 100%), 1fr));}
+.habit-grid{grid-template-columns:repeat(auto-fill, minmax(84px, 1fr));}
+.cols-2{display:grid; grid-template-columns:repeat(auto-fit, minmax(min(320px, 100%), 1fr)); gap:var(--s5); align-items:start;}
 
 .streak-flame{display:inline-flex; align-items:center; gap:3px; font-size:12px; font-weight:700; color:var(--clay);}
 .chart-bars{display:flex; align-items:flex-end; gap:6px; height:90px;}
@@ -228,7 +285,7 @@ hr.hair{border:none;border-top:1px solid var(--border); margin:14px 0;}
 .chart-bars .cb-label{font-size:10px; color:var(--ink-soft); text-align:center; margin-top:5px;}
 .cb-label-standalone{font-size:10px; color:var(--ink-soft); text-align:center; margin-top:5px; display:block;}
 
-.qty-btn{width:38px;height:38px;border-radius:11px;border:1px solid var(--border);background:var(--card-2);color:var(--ink);font-size:17px;font-weight:700;cursor:pointer;}
+.qty-btn{width:var(--tap);height:var(--tap);flex-shrink:0;border-radius:12px;border:1px solid var(--border);background:var(--card-2);color:var(--ink);font-size:17px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent;}
 .qty-btn:hover{background:var(--bg-soft);}
 
 .timer-display{font-family:'Fraunces',serif; font-size:56px; text-align:center; font-weight:600; letter-spacing:-.02em; margin:6px 0;}
@@ -236,7 +293,7 @@ hr.hair{border:none;border-top:1px solid var(--border); margin:14px 0;}
 .segmented button{flex:1; padding:8px; border:none; background:transparent; border-radius:9px; font-weight:600; font-size:13px; color:var(--ink-soft); cursor:pointer;}
 .segmented button.active{background:var(--card); color:var(--ink); box-shadow:0 1px 3px rgba(0,0,0,.08);}
 
-.color-dot{width:26px;height:26px;border-radius:50%; cursor:pointer; border:2px solid transparent; flex-shrink:0;}
+.color-dot{width:36px;height:36px;border-radius:50%; cursor:pointer; border:2px solid transparent; flex-shrink:0;}
 .color-dot.selected{border-color:var(--ink);}
 
 .cal-grid{display:grid; grid-template-columns:repeat(7,1fr); gap:4px;}
@@ -256,7 +313,12 @@ hr.hair{border:none;border-top:1px solid var(--border); margin:14px 0;}
 .switch input:checked + .slider{background:var(--accent);}
 .switch input:checked + .slider:before{transform:translateX(18px);}
 
-.linkline{display:flex; align-items:center; justify-content:space-between; padding:13px 4px; border-bottom:1px solid var(--border);}
+.linkline{display:flex; align-items:center; justify-content:space-between; gap:var(--s4); min-height:var(--tap); padding:var(--s3) var(--s1); border-bottom:1px solid var(--border);}
+/* Without these a long label slides under the switch on the right rather than
+   wrapping: the label needs permission to shrink, the control needs to refuse. */
+.linkline > :first-child{flex:1 1 auto; min-width:0;}
+.linkline > :last-child{flex:0 0 auto;}
+.linkline .ll-sub{display:block; font-size:11.5px; line-height:1.4; color:var(--ink-soft); margin-top:2px;}
 .linkline:last-child{border-bottom:none;}
 
 .fab{display:none;}
@@ -279,10 +341,108 @@ hr.hair{border:none;border-top:1px solid var(--border); margin:14px 0;}
 .cyc-legend span{display:inline-flex; align-items:center; gap:6px;}
 .cyc-swatch{width:12px;height:12px;border-radius:4px;display:inline-block;flex-shrink:0;}
 .chip-row{display:flex; flex-wrap:wrap; gap:8px;}
-.chip{border:1px solid var(--border); background:var(--card-2); color:var(--ink-soft); border-radius:999px; padding:7px 13px; font-size:12.5px; font-weight:600; cursor:pointer; display:inline-flex; align-items:center; gap:6px; font-family:inherit;}
+.chip{border:1px solid var(--border); background:var(--card-2); color:var(--ink-soft); border-radius:999px; padding:var(--s2) var(--s4); min-height:var(--tap); font-size:var(--t-sm); font-weight:600; cursor:pointer; display:inline-flex; align-items:center; justify-content:center; gap:6px; font-family:inherit; -webkit-tap-highlight-color:transparent;}
 .chip:hover{background:var(--bg-soft); color:var(--ink);}
 .chip.on{background:var(--accent-soft); color:var(--accent); border-color:var(--accent);}
 .chip.on-rose{background:var(--cyc-period-soft); color:var(--cyc-period); border-color:var(--cyc-period);}
+
+/* ---------- v2: inbox + Eisenhower matrix (Calm Focus colours) ---------- */
+:root{
+  --q-do:#D9542B; --q-do-soft:#FBE7DF; --q-do-ink:#A93A17;
+  --q-plan:#2F4EB8; --q-plan-soft:#E6EBF8; --q-plan-ink:#2F4EB8;
+  --q-quick:#D9A23A; --q-quick-soft:#FBF0D9; --q-quick-ink:#8A5A12;
+  --q-drop:#CFC9BC; --q-drop-ink:#6A6F7D; --q-done:#2F8A5B;
+}
+[data-theme="dark"]{
+  --q-do:#E8774F; --q-do-soft:rgba(232,119,79,.16); --q-do-ink:#F2A487;
+  --q-plan:#7C95EA; --q-plan-soft:rgba(124,149,234,.16); --q-plan-ink:#AFC0F5;
+  --q-quick:#E2B458; --q-quick-soft:rgba(226,180,88,.15); --q-quick-ink:#EBC77E;
+  --q-drop:#4A4F58; --q-drop-ink:#AFB5BC; --q-done:#8FD3AE;
+}
+.cap-bar{display:flex; gap:8px; align-items:center; background:var(--card); border:1px solid var(--border); border-radius:16px; padding:6px 6px 6px 14px; box-shadow:var(--shadow);}
+.cap-bar input{flex:1; border:none !important; background:transparent !important; outline:none; font-size:15px; color:var(--ink); padding:10px 0 !important; min-width:0; box-shadow:none !important;}
+.cap-bar .btn{flex-shrink:0; padding:10px 14px;}
+.cap-hint{display:flex; justify-content:space-between; gap:10px; font-size:12px; color:var(--ink-faint); margin-top:8px;}
+.cap-hint a{color:var(--q-plan-ink); font-weight:600; text-decoration:none;}
+.sort-card{background:var(--card); border-radius:18px; padding:18px; box-shadow:var(--shadow-lift); margin-top:14px;}
+.sort-eyebrow{display:flex; justify-content:space-between; font-size:12px; font-weight:600; color:var(--ink-faint);}
+.sort-title{font-family:'Fraunces',serif; font-size:22px; line-height:1.25; margin:8px 0 14px; word-break:break-word;}
+.sort-grid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:8px;}
+.sort-btn{min-height:60px; border-radius:12px; border:none; text-align:left; padding:10px 12px; display:flex; flex-direction:column; justify-content:center; gap:2px; cursor:pointer; font-family:inherit; transition:transform var(--fast) var(--ease);}
+.sort-btn:active{transform:scale(.97);}
+.sort-btn b{font-size:14.5px;} .sort-btn span{font-size:11.5px; opacity:.85;}
+.sort-btn.q-do{background:var(--q-do-soft); color:var(--q-do-ink);}
+.sort-btn.q-plan{background:var(--q-plan-soft); color:var(--q-plan-ink);}
+.sort-btn.q-quick{background:var(--q-quick-soft); color:var(--q-quick-ink);}
+.sort-btn.q-drop{background:transparent; color:var(--q-drop-ink); box-shadow:inset 0 0 0 1px var(--border);}
+.sort-foot{display:flex; justify-content:space-between; align-items:center; margin-top:12px; font-size:12px; color:var(--ink-faint);}
+.sort-foot button{background:none; border:none; color:var(--ink-soft); font:inherit; font-weight:600; cursor:pointer; padding:8px 0; min-height:var(--tap);}
+.mx-grid{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px;}
+.mx-box{background:var(--card); border-radius:16px; padding:14px; min-height:150px; box-shadow:var(--shadow); border-top:4px solid transparent; display:flex; flex-direction:column; min-width:0;}
+.mx-box.q-do{border-top-color:var(--q-do);}
+.mx-box.q-plan{border-top-color:var(--q-plan); background:var(--q-plan-soft);}
+.mx-box.q-quick{border-top-color:var(--q-quick);}
+.mx-box.q-drop{background:transparent; box-shadow:none; border:1px dashed var(--q-drop);}
+.mx-head{display:flex; justify-content:space-between; align-items:baseline;}
+.mx-name{font-weight:700; font-size:14px;}
+.q-do .mx-name{color:var(--q-do-ink);} .q-plan .mx-name{color:var(--q-plan-ink);} .q-quick .mx-name{color:var(--q-quick-ink);} .q-drop .mx-name{color:var(--q-drop-ink);}
+.mx-hint{font-size:11px; color:var(--ink-faint); margin:2px 0 6px;}
+.mx-item{display:flex; gap:8px; align-items:flex-start; padding:7px 0; border-top:1px solid var(--border);}
+.mx-item input[type=checkbox]{width:18px; height:18px; margin:1px 0 0; accent-color:var(--q-done); flex-shrink:0;}
+.mx-t{background:none; border:none; padding:0; text-align:left; color:var(--ink); font:inherit; font-size:13.5px; cursor:pointer; flex:1; min-width:0; word-break:break-word; line-height:1.35;}
+.mx-t small{display:block; font-size:11px; color:var(--ink-faint); margin-top:1px;}
+.mx-empty{font-size:12px; color:var(--ink-faint); padding:6px 0; line-height:1.45;}
+.mx-letgo{margin-top:auto; padding-top:8px;}
+.mx-note{margin-top:14px; padding:14px 16px; border-radius:14px; background:var(--card); box-shadow:var(--shadow); font-size:13px; line-height:1.55; color:var(--ink-soft);}
+.mx-note b{color:var(--q-plan-ink);}
+@media (min-width:900px){ .mx-box{min-height:220px;} .sort-card,.cap-bar{max-width:720px;} }
+
+/* ---------- v2: Calm Focus Today screen ---------- */
+.bn-cap-wrap{justify-content:center;}
+.bn-cap{width:52px; height:52px; border-radius:16px; background:var(--ink); color:var(--card); display:flex; align-items:center; justify-content:center; box-shadow:0 8px 20px rgba(30,34,48,.18);}
+.cf-top{display:flex; justify-content:space-between; align-items:center; gap:12px;}
+.cf-eyebrow{font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:.08em; color:var(--ink-soft); text-transform:uppercase;}
+.cf-avatar{width:44px; height:44px; border-radius:14px; border:1px solid var(--border); background:var(--card); color:var(--accent); font-family:'Fraunces',serif; font-size:19px; cursor:pointer; display:flex; align-items:center; justify-content:center;}
+.cf-h1{font-family:'Fraunces',serif; font-weight:500; font-size:clamp(34px, 9vw, 46px); line-height:1.04; letter-spacing:-.01em; margin:10px 0 0;}
+.cf-h1 em{font-style:italic; color:var(--ink-soft); font-weight:400;}
+.cf-frog{position:relative; overflow:hidden; margin-top:20px; padding:20px; border-radius:18px; background:var(--card); box-shadow:0 1px 0 var(--border), 0 12px 28px rgba(30,34,48,.07); display:flex; flex-direction:column; gap:12px;}
+.cf-ribbon{position:absolute; top:0; right:20px; width:20px; height:30px; background:var(--q-do); clip-path:polygon(0 0,100% 0,100% 100%,50% 76%,0 100%);}
+.cf-chiprow{display:flex; justify-content:space-between; align-items:center; gap:8px; padding-right:34px;}
+.cf-chip{font-size:12px; font-weight:600; padding:5px 10px; border-radius:8px;}
+.cf-chip.q-do{background:var(--q-do-soft); color:var(--q-do-ink);} .cf-chip.q-plan{background:var(--q-plan-soft); color:var(--q-plan-ink);}
+.cf-chip.q-quick{background:var(--q-quick-soft); color:var(--q-quick-ink);} .cf-chip.q-drop{background:var(--bg-soft); color:var(--q-drop-ink);}
+.cf-time{font-family:'JetBrains Mono',monospace; font-size:11px; color:var(--ink-soft);}
+.cf-frog-title{font-family:'Fraunces',serif; font-size:26px; line-height:1.15; word-break:break-word;}
+.cf-frog-sub{font-size:13px; color:var(--ink-soft);}
+.cf-cta{min-height:52px; border-radius:14px; border:none; background:var(--accent); color:var(--accent-ink); font:inherit; font-weight:700; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:8px;}
+.cf-cta.ghost{background:var(--bg-soft); color:var(--ink);}
+.cf-sec{display:flex; justify-content:space-between; align-items:baseline; margin:24px 0 10px;}
+.cf-sec h2{font-family:inherit; font-size:15px; font-weight:700; margin:0; letter-spacing:0;}
+.cf-sec span{font-size:13px; font-weight:600; color:var(--q-done);}
+.cf-seg{display:grid; gap:6px; margin-bottom:6px;}
+.cf-seg i{display:block; height:8px; border-radius:4px; background:var(--border);}
+.cf-seg i.on{background:var(--q-done);}
+.cf-row{display:flex; align-items:center; gap:14px; min-height:62px; border-bottom:1px solid var(--border);}
+.cf-row input{width:22px; height:22px; margin:0; accent-color:var(--q-done); flex-shrink:0;}
+.cf-row-t{flex:1; min-width:0; background:none; border:none; padding:6px 0; text-align:left; color:var(--ink); font:inherit; cursor:pointer;}
+.cf-row-t b{display:block; font-size:15.5px; font-weight:500; word-break:break-word;}
+.cf-row-t small{display:block; font-size:12px; color:var(--ink-soft); margin-top:3px;}
+.cf-row.done b{color:var(--ink-faint); text-decoration:line-through;}
+.cf-row.done small{color:var(--q-done);}
+.cf-mini{font-size:11px; font-weight:600; padding:4px 8px; border-radius:6px; flex-shrink:0;}
+.cf-days{font-family:'JetBrains Mono',monospace; font-size:10.5px; letter-spacing:.12em; color:var(--ink-faint);}
+.cf-hb{display:flex; justify-content:space-between; align-items:center; gap:10px; width:100%; min-height:48px; padding:6px 0; background:none; border:none; border-bottom:1px solid var(--border); color:var(--ink); font:inherit; text-align:left; cursor:pointer;}
+.cf-hb b{display:block; font-size:14.5px; font-weight:500;}
+.cf-hb small{display:block; font-size:11.5px; font-weight:600; margin-top:1px;}
+.cf-sq{display:flex; gap:5px; flex-shrink:0;}
+.cf-sq i{width:12px; height:12px; border-radius:3px; box-shadow:inset 0 0 0 1.5px var(--border);}
+.cf-sq i.d{background:var(--q-done); box-shadow:none;}
+.cf-sq i.t{box-shadow:inset 0 0 0 2px var(--accent);}
+.cf-sq i.c{box-shadow:inset 0 0 0 2px var(--q-quick);}
+.cf-energy{display:flex; gap:6px; flex-wrap:wrap;}
+.cf-energy button{flex:1; min-width:58px; min-height:44px; border-radius:12px; border:1px solid var(--border); background:var(--card); color:var(--ink); font:inherit; font-size:12.5px; font-weight:600; cursor:pointer;}
+.cf-energy button.on{background:var(--ink); color:var(--card); border-color:var(--ink);}
+.cf-wrap{max-width:680px;}
 </style>
 </head>
 <body>
@@ -328,7 +488,7 @@ hr.hair{border:none;border-top:1px solid var(--border); margin:14px 0;}
 const STORAGE_KEY = "daybook_state_v1";
 const DAYS = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 const MONTHS = ["January","February","March","April","May","June","July","August","September","October","November","December"];
-const ACCENTS = ["#4F7A68","#3E6C93","#8A5FA8","#C1543C","#C99A3E","#4F8FA6","#7A6FD4","#4F7A68"];
+const ACCENTS = ["#2F4EB8","#4F7A68","#3E6C93","#8A5FA8","#C1543C","#C99A3E","#4F8FA6","#7A6FD4"];
 const QUOTES = [
 ["The secret of getting ahead is getting started.","Mark Twain"],
 ["Small daily improvements are the key to staggering long-term results.","Robin Sharma"],
@@ -362,11 +522,11 @@ const QUOTES = [
 ["Be patient with yourself. Self-growth is tender territory.","Stephen Covey"],
 ];
 const MOODS = [
-{v:5, emoji:"😄", label:"Great"},
-{v:4, emoji:"🙂", label:"Good"},
-{v:3, emoji:"😐", label:"Okay"},
-{v:2, emoji:"😕", label:"Low"},
-{v:1, emoji:"😞", label:"Bad"},
+{v:5, emoji:"🚀", label:"Peak"},
+{v:4, emoji:"⚡", label:"High"},
+{v:3, emoji:"🙂", label:"Steady"},
+{v:2, emoji:"🥱", label:"Low"},
+{v:1, emoji:"🪫", label:"Drained"},
 ];
 const HABIT_ICONS = ["dumbbell","book-open","brain","graduation-cap","moon","apple","droplets","pen-line","music","heart"];
 const SESSION_TYPES = [
@@ -377,8 +537,9 @@ const SESSION_TYPES = [
   {id:"custom", label:"Custom", icon:"sparkles"},
 ];
 const NAV_ITEMS = [
-  {id:"home", label:"Home", icon:"home"},
+  {id:"home", label:"Today", icon:"sun"},
   {id:"tasks", label:"Tasks", icon:"check-square"},
+  {id:"matrix", label:"Matrix", icon:"layout-grid"},
   {id:"habits", label:"Habits", icon:"repeat"},
   {id:"goals", label:"Goals", icon:"target"},
   {id:"focus", label:"Focus", icon:"timer"},
@@ -389,8 +550,8 @@ const NAV_ITEMS = [
   {id:"insights", label:"Insights", icon:"bar-chart-3"},
   {id:"settings", label:"Settings", icon:"settings"},
 ];
-const BOTTOM_NAV = ["home","tasks","calendar","focus","journal","more"];
-const MORE_SHEET_ITEMS = ["habits","goals","health","cycle","insights","settings"];
+const BOTTOM_NAV = ["home","matrix","capture","focus","more"];
+const MORE_SHEET_ITEMS = ["tasks","journal","habits","goals","calendar","insights","settings","health","cycle"];
 const GOAL_TYPES = [
   {id:"project", label:"Project", icon:"briefcase"},
   {id:"study", label:"Study / Exam", icon:"graduation-cap"},
@@ -435,8 +596,12 @@ function defaultState(){
     user:{ name:"Alex", avatarEmoji:"🌿", darkMode:false, accent:ACCENTS[0], gender:null },
     settings:{ waterGoalMl:2500, sleepGoalHrs:8, pomodoroFocusMin:25, pomodoroBreakMin:5,
       notifTasks:true, notifWater:true, notifHabits:true, notifMeds:true, notifSound:true, soundChoice:"chime", quotePref:"mixed",
+      waterReminderTimes:["10:00","13:00","16:00","19:00"], habitReminderTime:"20:00",
+      journalPinAttempts:0, journalPinLockUntil:0,
       journalLockEnabled:false, journalPinHash:null, journalUnlockMethod:"pin", journalWebAuthnCredId:null,
       cycleTrackingEnabled:false, notifCycle:true, cycleReminderDays:2, avgCycleLengthOverride:null, avgPeriodLengthOverride:null,
+      healthEnabled:false,
+      checkinEnabled:true, checkinMorningHour:6, checkinEveningHour:20,
       legalAcceptedVersion:null, legalAcceptedAt:null, lastExportAt:null, backupNudgeDismissedAt:null,
       installNudgeDismissedAt:null, firstRunAt:null },
     categories:["Personal","Work","Study","Errands"],
@@ -457,14 +622,15 @@ function defaultState(){
     habitLogs:{ [y]:{} },
     water:{ logs:{ [today]:500 } },
     mood:{ logs:{} },
-    pomodoro:{ sessions:{} },
+    pomodoro:{ sessions:{}, timer:null, carrySec:0 },
     workouts:[],
     health:{ sleepLogs:{} },
     medicines:[
-      {id:uid(), name:"Vitamin D", dosage:"1 tablet", time:"09:00"},
+      {id:uid(), name:"Stretch for five minutes", time:"09:00"},
     ],
     medicineLogs:{},
     reflections:{},
+    checkins:{},
     cycle:{ periods:[], logs:{} },
     focusSessions:[
       {id:uid(), date:today, type:"pomodoro", label:"Morning Pomodoro", startTime:"09:00", duration:25, completed:true},
@@ -492,17 +658,64 @@ function defaultState(){
   };
 }
 
+/* JSON.parse happily creates an own "__proto__" key, and Object.assign then
+   writes it through to Object.prototype. A hand-edited backup file could
+   poison every object in the app that way, so every parsed payload goes
+   through here first. */
+const FORBIDDEN_KEYS = new Set(["__proto__","constructor","prototype"]);
+function sanitizeParsed(value, depth){
+  depth = depth || 0;
+  if(depth > 40) return null;
+  if(Array.isArray(value)) return value.map(v=>sanitizeParsed(v, depth+1));
+  if(value && typeof value === "object"){
+    const out = Object.create(null);
+    for(const k of Object.keys(value)){
+      if(FORBIDDEN_KEYS.has(k)) continue;
+      out[k] = sanitizeParsed(value[k], depth+1);
+    }
+    return Object.assign({}, out);
+  }
+  if(typeof value === "function") return null;
+  return value;
+}
+function safeParse(raw){ return sanitizeParsed(JSON.parse(raw)); }
+/* A backup is only a backup of this app if it has the shape of one. */
+function looksLikeBackup(o){
+  return !!o && typeof o === "object" && !Array.isArray(o)
+    && (Array.isArray(o.tasks) || Array.isArray(o.habits) || (o.journal && typeof o.journal === "object") || (o.settings && typeof o.settings === "object"));
+}
+
 let state = load();
 function load(){
   try{
     const raw = localStorage.getItem(STORAGE_KEY);
     if(!raw) return defaultState();
-    const parsed = JSON.parse(raw);
+    const parsed = safeParse(raw);
     // shallow-merge with defaults for forward-compat
     const def = defaultState();
     // returning users (any existing saved state) shouldn't see the onboarding wizard
     // just because it's a newly added field, so only truly fresh installs get it.
     if(parsed.onboarded === undefined) parsed.onboarded = true;
+    /* Health became opt-in. Anyone already running the app had it, and may have
+       medicines set up in there, so a saved state without the flag means
+       "existing user, leave it on". A fresh install has no saved state at all
+       and takes the default, which is off. */
+    if(parsed.settings && parsed.settings.healthEnabled === undefined) parsed.settings.healthEnabled = true;
+    /* v2: Calm Focus blue replaces the old default green, once. A colour the user picked themselves is kept. */
+    if(parsed.settings && !parsed.settings.v2AccentMigrated){
+      if(parsed.user && (parsed.user.accent === "#4F7A68" || !parsed.user.accent)) parsed.user.accent = "#2F4EB8";
+      parsed.settings.v2AccentMigrated = true;
+    }
+    /* The medicine list became a plain daily reminder list: a name, a time and
+       a tick. Anyone who had filled in the old dosage field keeps what they
+       typed, folded into the name, so nothing they wrote is thrown away. */
+    if(Array.isArray(parsed.medicines)){
+      parsed.medicines.forEach(m=>{
+        if(m && m.dosage){ m.name = (m.name ? m.name+", "+m.dosage : m.dosage); m.dosage = ""; }
+      });
+    }
+    /* An avatar is one character. A backup could hold anything. */
+    if(parsed.user && parsed.user.avatarEmoji) parsed.user.avatarEmoji = firstGrapheme(parsed.user.avatarEmoji);
     return Object.assign({}, def, parsed, {
       user:Object.assign({},def.user, parsed.user||{}),
       settings:Object.assign({},def.settings, parsed.settings||{}),
@@ -511,10 +724,27 @@ function load(){
   }catch(e){ console.warn("load failed, resetting", e); return defaultState(); }
 }
 let saveTimer=null;
+let saveFailureAnnounced=false;
 function save(){
   clearTimeout(saveTimer);
   saveTimer = setTimeout(()=>{
-    try{ localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); }catch(e){ console.warn("save failed", e); }
+    try{
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+      saveFailureAnnounced = false;
+    }catch(e){
+      console.warn("save failed", e);
+      /* This used to fail in silence. If the device is full, everything typed
+         from here on is lost the moment the app closes, and the person has to
+         be told while they can still do something about it. */
+      if(!saveFailureAnnounced){
+        saveFailureAnnounced = true;
+        try{
+          const full = e && (e.name === "QuotaExceededError" || e.name === "NS_ERROR_DOM_QUOTA_REACHED" || e.code === 22);
+          toast(full ? "Storage is full. Changes are NOT being saved. Export a backup and free up space."
+                     : "Couldn't save to this device. Changes are NOT being saved.", "alert-triangle");
+        }catch(e2){}
+      }
+    }
     try{ if(typeof syncNativeNotifications==="function") syncNativeNotifications(); }catch(e){}
   }, 120);
 }
@@ -537,6 +767,95 @@ function toast(msg, iconName){
   root.appendChild(el);
   mountIcons();
   setTimeout(()=>{ el.style.opacity="0"; el.style.transform="translateY(-6px)"; el.style.transition="all .25s"; setTimeout(()=>el.remove(),250); }, 2600);
+}
+/* An emoji is rarely one character to a computer: a flag is two code points,
+   a family can be seven joined by zero-width joiners, and a skin tone adds a
+   modifier. Intl.Segmenter counts what a person would call one character;
+   where it is missing, Array.from at least respects surrogate pairs so a
+   single emoji is not sliced in half. */
+function firstGrapheme(str){
+  const t = String(str == null ? "" : str).replace(/[\r\n\t]/g, "").trim();
+  if(!t) return "";
+  return graphemes(t)[0] || "";
+}
+/* Which single character to keep depends on how it arrived. Typing one on top
+   of a filled field gives two, and the new one is meant: keep the last. A
+   pasted word arrives all at once, and its last letter is nobody's intent:
+   keep the first. */
+/* Where Intl.Segmenter is missing, Array.from is not enough: it respects
+   surrogate pairs but still splits a sun into a sun plus an invisible
+   variation selector, a flag into two letters, and a thumbs up into a hand
+   and a skin tone. Taking "the second part" then hands back the invisible
+   half, which reads to the user as the emoji key doing nothing. Group the
+   code points into what a person would call one character first. */
+function graphemesFallback(t){
+  const cps = Array.from(t);
+  const ZWJ = 0x200D, KEYCAP = 0x20E3;
+  const isRI    = c => c >= 0x1F1E6 && c <= 0x1F1FF;
+  const isSkin  = c => c >= 0x1F3FB && c <= 0x1F3FF;
+  const isVS    = c => c === 0xFE0E || c === 0xFE0F;
+  const isMark  = c => (c >= 0x0300 && c <= 0x036F) || (c >= 0x1AB0 && c <= 0x1AFF)
+                    || (c >= 0x20D0 && c <= 0x20FF) || (c >= 0xFE00 && c <= 0xFE0F);
+  const out = [];
+  for(let i = 0; i < cps.length; i++){
+    let piece = cps[i];
+    let code = piece.codePointAt(0);
+    if(isRI(code) && i + 1 < cps.length && isRI(cps[i+1].codePointAt(0))){
+      piece += cps[++i];                       /* a flag is two letters */
+    }
+    for(;;){
+      const nxt = cps[i+1];
+      if(!nxt) break;
+      const n = nxt.codePointAt(0);
+      if(isSkin(n) || isVS(n) || isMark(n) || n === KEYCAP){ piece += cps[++i]; continue; }
+      /* A zero width joiner means "and the next one too". Typing a family
+         emoji arrives one code point at a time, so absorb a joiner even when
+         its partner has not landed yet, or the half built sequence is read as
+         two separate characters and the wrong half is kept. */
+      if(n === ZWJ){ piece += cps[++i]; if(cps[i+1]) piece += cps[++i]; continue; }
+      break;
+    }
+    out.push(piece);
+  }
+  return out;
+}
+function graphemes(t){
+  try{
+    if(typeof Intl !== "undefined" && Intl.Segmenter){
+      return [...new Intl.Segmenter(undefined, {granularity:"grapheme"}).segment(t)].map(p=>p.segment);
+    }
+  }catch(e){}
+  return graphemesFallback(t);
+}
+function pickGrapheme(str){
+  const t = String(str == null ? "" : str).replace(/[\r\n\t]/g, "").trim();
+  if(!t) return "";
+  const parts = graphemes(t);
+  if(!parts.length) return "";
+  const picked = parts.length === 2 ? parts[1] : parts[0];
+  return picked.replace(/\u200D+$/, "");   /* never store a dangling joiner */
+}
+/* Android's emoji keyboard inserts through an IME composition. Rewriting
+   input.value while that composition is still open cancels it, and the emoji
+   the user just tapped disappears as fast as it arrived. So hold off until the
+   composition ends, and never reassign a value that is already correct, because
+   even an identical assignment moves the caret and makes the keyboard resync. */
+function bindSingleGraphemeInput(el, onPick){
+  if(!el) return;
+  let composing = false;
+  const apply = ()=>{
+    /* A joined emoji such as a family lands one code point at a time and is
+       momentarily a person followed by a joiner. Touching the field then would
+       throw away everything still on its way, so wait for the rest. */
+    if(/\u200D$/.test(el.value)) return;
+    const g = pickGrapheme(el.value);
+    if(el.value !== g) el.value = g;
+    if(g) onPick(g);
+  };
+  el.addEventListener("compositionstart", ()=>{ composing = true; });
+  el.addEventListener("compositionend", ()=>{ composing = false; apply(); });
+  el.addEventListener("input", ()=>{ if(!composing) apply(); });
+  el.addEventListener("change", ()=>{ composing = false; apply(); });
 }
 function escapeHtml(s){ return String(s).replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
 
@@ -595,6 +914,9 @@ function renderShell(){
 
   const bn = document.getElementById("bottomnav");
   bn.innerHTML = BOTTOM_NAV.map(id=>{
+    if(id==="capture"){
+      return `<button class="bn-item bn-cap-wrap" id="bn-capture" aria-label="Capture a thought"><span class="bn-cap">${icon("plus",22)}</span></button>`;
+    }
     if(id==="more"){
       const active = MORE_SHEET_ITEMS.includes(ui.route);
       return `<button class="bn-item ${active?'active':''}" id="bn-more">${icon("more-horizontal",21)}<span>More</span></button>`;
@@ -604,6 +926,7 @@ function renderShell(){
   }).join("");
   bn.querySelectorAll("[data-route]").forEach(b=> b.onclick = ()=>setRoute(b.dataset.route));
   document.getElementById("bn-more").onclick = ()=>openMoreSheet();
+  const capBtn = document.getElementById("bn-capture"); if(capBtn) capBtn.onclick = openCaptureSheet;
 
   document.getElementById("topbar-theme").innerHTML = icon(state.user.darkMode?"sun":"moon",17);
   document.getElementById("topbar-theme").onclick = toggleTheme;
@@ -637,6 +960,8 @@ function applyTheme(){
 }
 function applyAccent(){
   document.documentElement.style.setProperty("--accent", state.user.accent);
+  /* the soft tint follows the chosen accent instead of staying green */
+  document.documentElement.style.setProperty("--accent-soft", "color-mix(in srgb, " + state.user.accent + " 13%, transparent)");
   const meta = document.querySelector('meta[name=theme-color]'); if(meta) meta.content = state.user.accent;
 }
 
@@ -657,6 +982,19 @@ const REPEAT_OPTIONS = [
   {id:"weekly",   label:"Every week on this day", short:"Weekly"},
 ];
 function taskRepeats(t){ return !!t.repeat && t.repeat !== "none"; }
+/* Water and habit reminders. Both switches existed in Settings and were read
+   by nothing at all, so the app was promising reminders it never sent. */
+function habitDoneOn(habitId, dateKey){ return !!(state.habitLogs[dateKey]||{})[habitId]; }
+function waterGoalMetOn(dateKey){
+  return (state.water.logs[dateKey]||0) >= (state.settings.waterGoalMl||2500);
+}
+function waterReminderTimes(){
+  const t = state.settings.waterReminderTimes;
+  return Array.isArray(t) ? t.filter(x=>/^\d{2}:\d{2}$/.test(x)) : [];
+}
+function habitsWithReminders(){
+  return state.habits.filter(h=>h.time && /^\d{2}:\d{2}$/.test(h.time));
+}
 function taskOccursOn(t, key){
   if(!taskRepeats(t)) return t.date === key;
   if(!t.date || key < t.date) return false;
@@ -716,8 +1054,6 @@ function dayCompletionPct(dateKey){
   const dayTasks = tasksForDate(dateKey);
   total += dayTasks.length; done += dayTasks.filter(t=>taskDoneOn(t,dateKey)).length;
   total += state.habits.length; done += state.habits.filter(h=> (state.habitLogs[dateKey]||{})[h.id]).length;
-  const waterGoal = state.settings.waterGoalMl; const waterVal = (state.water.logs[dateKey]||0);
-  total += 1; if(waterVal>=waterGoal) done+=1; else done += clamp(waterVal/waterGoal,0,1);
   if(total===0) return 0;
   return clamp(Math.round((done/total)*100),0,100);
 }
@@ -802,13 +1138,167 @@ function dayBriefHtml(){
       else if(repeatingTasks().length) lines.push("The streak broke today - it restarts tomorrow.");
     }
   }
+  /* If you named the main thing at the morning check-in, that is the headline
+     and the counts drop to a supporting line. Two panels saying "4 things to do
+     today" in different words is the repetition worth removing. */
+  const ci = checkinFor(today);
+  const intention = ci && ci.morning && ci.morning.intention;
+  if(intention){
+    lines.unshift(head);
+    head = escapeHtml(intention);
+  }
+  const doneToday = ci && ci.evening;
   return `<div class="card day-brief">
-    <div class="brief-label">${icon(evening?"moon":"sunrise",13)} ${evening?"This evening":"Your day ahead"}</div>
+    <div class="brief-label">${icon(evening?"moon":"sunrise",13)} ${intention ? "Today's main thing" : (evening?"This evening":"Your day ahead")}</div>
     <div class="brief-head">${head}</div>
-    ${lines.length?`<div class="brief-body">${lines.map(l=>`<div>${l}</div>`).join("")}</div>`:""}
+    ${lines.length?`<div class="brief-body">${lines.slice(0,3).map(l=>`<div>${l}</div>`).join("")}</div>`:""}
+    ${doneToday?"":`<button class="btn btn-ghost" id="brief-checkin" style="margin-top:12px; padding:7px 12px; font-size:12.5px;">${icon(evening?"moon":"sunrise",14)} ${evening?"Close out the day":"Plan the day"}</button>`}
   </div>`;
 }
+
+/* =========================================================
+   VIEW: TODAY (v2, Calm Focus). Replaces the old dashboard.
+   One thing first (the frog), today's list, habits as a week
+   grid, energy. The old dashboard stays as renderHomeClassic.
+   ========================================================= */
+function openCaptureSheet(){
+  openModal(`
+    <div class="modal-head"><h3>Capture</h3><button class="icon-btn-plain" onclick="__closeModal()">${icon("x",20)}</button></div>
+    <p class="muted" style="font-size:13px; margin:-6px 0 12px;">Get it out of your head. Sort it later.</p>
+    <div class="cap-bar"><input type="text" id="sheet-cap" maxlength="200" placeholder="A task, an idea, anything" aria-label="Capture a thought" enterkeyhint="done"/><button class="btn btn-primary" id="sheet-cap-add">${icon("plus",15)} Add</button></div>
+    <div class="cap-hint"><span>Takes under 2 minutes? Just do it now.</span><a href="#" id="sheet-cap-sort">Sort inbox</a></div>
+  `);
+  const input = document.getElementById("sheet-cap");
+  setTimeout(()=>{ try{ input.focus(); }catch(e){} }, 250);
+  const go = ()=>{
+    if(captureToInbox(input.value)){ input.value=""; toast("In your inbox. Out of your head.","inbox"); if(ui.route==="home"||ui.route==="matrix") rerenderCurrent(); }
+    else input.focus();
+  };
+  document.getElementById("sheet-cap-add").onclick = go;
+  input.onkeydown = e=>{ if(e.key==="Enter"){ e.preventDefault(); go(); } };
+  document.getElementById("sheet-cap-sort").onclick = e=>{ e.preventDefault(); closeModal(); setRoute("matrix"); };
+}
+function isoWeek(d){
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  const day = t.getUTCDay() || 7; t.setUTCDate(t.getUTCDate() + 4 - day);
+  const y0 = new Date(Date.UTC(t.getUTCFullYear(),0,1));
+  return Math.ceil((((t - y0) / 86400000) + 1) / 7);
+}
+const QUAD_RANK = {do:0, plan:1, quick:2, drop:3};
+function quadLabel(q){ const x = QUADRANTS.find(z=>z.id===q); return x ? x.label : ""; }
 function renderHome(){
+  const root = document.getElementById("view-root");
+  const today = todayKey();
+  const now = new Date();
+  const DAYS3 = ["SUN","MON","TUE","WED","THU","FRI","SAT"];
+  const eyebrow = DAYS3[now.getDay()]+" "+now.getDate()+" "+MONTHS[now.getMonth()].slice(0,3).toUpperCase()+" · WEEK "+isoWeek(now);
+  const hr = now.getHours();
+  const greet = hr < 12 ? "Morning" : hr < 17 ? "Afternoon" : "Evening";
+  const first = String(state.user.name||"").trim().split(/\s+/)[0];
+  const list = tasksForDate(today).slice().sort((a,b)=> (a.time||"99:99").localeCompare(b.time||"99:99"));
+  const open = list.filter(t=>!taskDoneOn(t,today));
+  const done = list.filter(t=> taskDoneOn(t,today));
+  const frog = open.slice().sort((a,b)=> (QUAD_RANK[taskQuadrant(a)]-QUAD_RANK[taskQuadrant(b)]) || (a.time||"99:99").localeCompare(b.time||"99:99"))[0];
+  const rest = open.filter(t=>t!==frog).concat(done);
+  const inboxN = ensureInbox().length;
+  const sub = frog ? "One thing first." : (list.length ? "All clear. Well done." : "A fresh page.");
+
+  let frogHtml;
+  if(frog){
+    const q = taskQuadrant(frog);
+    const chip = q==="do" ? "Do now · the frog" : quadLabel(q)+" · first up";
+    const dur = state.settings.pomodoroFocusMin || 25;
+    frogHtml = `<div class="cf-frog">
+      ${q==="do" ? `<div class="cf-ribbon" aria-hidden="true"></div>` : ""}
+      <div class="cf-chiprow"><span class="cf-chip q-${q}">${chip}</span><span class="cf-time">${frog.time ? escapeHtml(frog.time) : "TODAY"}</span></div>
+      <div class="cf-frog-title">${escapeHtml(frog.title)}</div>
+      <div class="cf-frog-sub">${q==="do" ? "Do the hardest thing while your mind is fresh." : "Nothing urgent. A good moment for what matters."}</div>
+      <button class="cf-cta" data-route="focus">${icon("play",15)} Start ${dur} min focus</button>
+    </div>`;
+  } else {
+    frogHtml = `<div class="cf-frog">
+      <div class="cf-frog-title">${list.length ? "Everything on today's list is done." : "Nothing planned for today yet."}</div>
+      <div class="cf-frog-sub">${list.length ? "Close the day, or get ahead on something that matters." : "Add one task that would make today a good day."}</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="cf-cta" id="cf-add" style="flex:1;">${icon("plus",15)} Add a task</button>
+        ${inboxN ? `<button class="cf-cta ghost" data-route="matrix" style="flex:1;">Sort inbox (${inboxN})</button>` : ""}
+      </div>
+    </div>`;
+  }
+
+  const segN = Math.max(3, Math.min(list.length, 6));
+  const segOn = Math.min(done.length, segN);
+  const rowHtml = t => {
+    const isDone = taskDoneOn(t,today), q = taskQuadrant(t);
+    const meta = isDone ? "Done" : [t.time || "Today", quadLabel(q)].filter(Boolean).join(" · ");
+    return `<div class="cf-row ${isDone?'done':''}">
+      <input type="checkbox" data-cf-done="${t.id}" ${isDone?'checked':''} aria-label="Mark ${escapeHtml(t.title)} done"/>
+      <button class="cf-row-t" data-cf-edit="${t.id}"><b>${escapeHtml(t.title)}</b><small>${escapeHtml(meta)}</small></button>
+      ${!isDone && q!=="do" ? `<span class="cf-mini cf-chip q-${q}">${q==="plan"?"Plan":q==="quick"?"Quick":"Later"}</span>` : ""}
+    </div>`;
+  };
+
+  const days = [6,5,4,3,2,1,0].map(i=>addDays(today,-i));
+  const letters = days.map(k=>"SMTWTFS"[new Date(k+"T00:00:00").getDay()]).join(" ");
+  const habitHtml = state.habits.map(h=>{
+    const doneToday = !!(state.habitLogs[today]||{})[h.id];
+    const yday = !!(state.habitLogs[addDays(today,-1)]||{})[h.id];
+    const streak = habitStreak(h.id, doneToday ? today : addDays(today,-1));
+    const comeback = !doneToday && !yday && Object.keys(state.habitLogs).some(k=>k<today && (state.habitLogs[k]||{})[h.id]);
+    let subTxt, subCol;
+    if(doneToday){ subTxt = streak+" day"+(streak===1?"":"s"); subCol = "var(--q-done)"; }
+    else if(comeback){ subTxt = "Comeback · do a small version"; subCol = "var(--q-quick-ink)"; }
+    else if(streak){ subTxt = streak+" day streak · today open"; subCol = "var(--ink-soft)"; }
+    else { subTxt = "Today"; subCol = "var(--ink-soft)"; }
+    const sq = days.map(k=>{
+      const d = !!(state.habitLogs[k]||{})[h.id];
+      if(d) return `<i class="d"></i>`;
+      if(k===today) return `<i class="${comeback?'c':'t'}"></i>`;
+      return `<i></i>`;
+    }).join("");
+    return `<button class="cf-hb" data-habit-toggle="${h.id}" aria-label="${doneToday?'Undo':'Check off'} ${escapeHtml(h.name)} for today">
+      <span><b>${escapeHtml(h.name)}</b><small style="color:${subCol}">${subTxt}</small></span>
+      <span class="cf-sq">${sq}</span></button>`;
+  }).join("");
+
+  const moodToday = (state.mood.logs[today]||{}).value;
+  root.innerHTML = `<div class="cf-wrap">
+    <div class="cf-top"><span class="cf-eyebrow">${eyebrow}</span>
+      <button class="cf-avatar" data-route="settings" aria-label="Settings">${escapeHtml((first||"").charAt(0).toUpperCase() || "·")}</button></div>
+    <h1 class="cf-h1">${greet}${first?", "+escapeHtml(first):""}.<br><em>${sub}</em></h1>
+    ${frogHtml}
+    ${captureCardHtml("home-cap")}
+    <div class="cf-sec"><h2>Today</h2><span>${done.length} done · ${open.length} to go</span></div>
+    <div class="cf-seg" style="grid-template-columns:repeat(${segN},minmax(0,1fr));">${Array.from({length:segN},(_,i)=>`<i class="${i<segOn?'on':''}"></i>`).join("")}</div>
+    ${rest.length ? rest.slice(0,8).map(rowHtml).join("") : `<div class="cf-frog-sub" style="padding:10px 0;">${list.length?"That's everything for today.":"Tap + to capture something, or add a task."}</div>`}
+    ${rest.length>8 ? `<a href="#" data-route="tasks" class="cap-hint" style="display:block; margin-top:10px;">See all ${list.length} tasks</a>` : ""}
+    ${state.habits.length ? `<div class="cf-sec"><h2>Habits</h2><span class="cf-days">${letters}</span></div>${habitHtml}
+      <div class="cap-hint"><span>Missed a day? Never miss twice.</span><a href="#" data-route="habits">Manage</a></div>` : ""}
+    <div class="cf-sec"><h2>How is your energy?</h2><span></span></div>
+    <div class="cf-energy">${MOODS.slice().reverse().map(m=>`<button data-mood="${m.v}" class="${moodToday===m.v?'on':''}">${m.label}</button>`).join("")}</div>
+    <div style="height:24px;"></div>
+  </div>`;
+
+  root.querySelectorAll("[data-route]").forEach(a=>a.onclick=(e)=>{e.preventDefault(); setRoute(a.dataset.route);});
+  const add = document.getElementById("cf-add"); if(add) add.onclick = ()=>openTaskModal();
+  bindCaptureBar("home-cap", renderHome);
+  root.querySelectorAll("[data-cf-done]").forEach(cb=> cb.onchange = ()=>{
+    const t = state.tasks.find(x=>x.id===cb.dataset.cfDone); if(!t) return;
+    setTaskDone(t, today, cb.checked); save();
+    if(cb.checked) toast("Done. Nice work.","check");
+    setTimeout(renderHome, 200);
+  });
+  root.querySelectorAll("[data-cf-edit]").forEach(b=> b.onclick = ()=> openTaskModal(b.dataset.cfEdit));
+  bindHabitChipEvents(root, today);
+  root.querySelectorAll("[data-mood]").forEach(b=> b.onclick = ()=>{
+    const v = parseInt(b.dataset.mood,10);
+    state.mood.logs[today] = Object.assign({}, state.mood.logs[today], {value:v});
+    save(); renderHome();
+  });
+  mountIcons();
+}
+
+function renderHomeClassic(){
   const today = todayKey();
   const pct = dayCompletionPct(today);
   const dayTasks = tasksForDate(today).sort((a,b)=> (a.time||"99:99").localeCompare(b.time||"99:99"));
@@ -816,7 +1306,7 @@ function renderHome(){
   const moodToday = (state.mood.logs[today]||{}).value;
 
   const layout = getDashboardLayout();
-  const enabled = layout.filter(s=>s.enabled).map(s=>s.id).filter(id=> id!=="cycle" || cycleEnabled());
+  const enabled = layout.filter(s=>s.enabled).map(s=>s.id).filter(id=> DASHBOARD_SECTIONS.some(d=>d.id===id));
   const zoneOf = id => (DASHBOARD_SECTIONS.find(s=>s.id===id)||{}).zone;
   const leftIds = enabled.filter(id=>zoneOf(id)==="left");
   const rightIds = enabled.filter(id=>zoneOf(id)==="right");
@@ -831,7 +1321,7 @@ function renderHome(){
       </div>`,
     habits: ()=>`
       <div class="section-title"><h2>Habits</h2><a href="#" data-route="habits" class="muted" style="font-size:12.5px; font-weight:600;">View all →</a></div>
-      <div class="card grid grid-3" style="gap:10px;">
+      <div class="card grid habit-grid" style="gap:10px;">
         ${state.habits.slice(0,6).map(h=>habitChipHtml(h,today)).join("") || emptyState("repeat","No habits yet","Add a habit to start tracking.")}
       </div>`,
     goals: ()=>`
@@ -863,7 +1353,7 @@ function renderHome(){
       </div>`,
     mood: ()=>`
       <div class="card" style="margin-bottom:16px;">
-        <div style="font-weight:700; font-size:14px; margin-bottom:10px;">Mood check-in</div>
+        <div style="font-weight:700; font-size:14px; margin-bottom:10px;">How is your energy?</div>
         <div class="mood-row">
           ${MOODS.map(m=>`<div class="mood-opt ${moodToday===m.v?'selected':''}" data-mood="${m.v}"><span class="emoji">${m.emoji}</span><span class="lbl">${m.label}</span></div>`).join("")}
         </div>
@@ -895,7 +1385,7 @@ function renderHome(){
   root.innerHTML = `
     <div class="hero">
       <div>
-        <h1>${greeting()}, ${escapeHtml(state.user.name||"Friend")} ${state.user.avatarEmoji||""}</h1>
+        <h1>${greeting()}, ${escapeHtml(state.user.name||"Friend")} ${escapeHtml(state.user.avatarEmoji||"")}</h1>
         <div class="sub">${DAYS[new Date().getDay()]==="Sun"?"Sunday":new Date().toLocaleDateString(undefined,{weekday:'long'})}, ${fmtDateLong(today)}</div>
       </div>
       <div style="display:flex; align-items:center; gap:10px;">
@@ -947,6 +1437,8 @@ function renderHome(){
       </div>
     </div>`:""}
 
+    ${captureCardHtml("home-cap")}
+
     ${showQuote ? quoteCardHtml() : ""}
 
     ${anyEnabled ? `
@@ -966,9 +1458,15 @@ function renderHome(){
   const instDis = document.getElementById("install-dismiss"); if(instDis) instDis.onclick = ()=>{ state.settings.installNudgeDismissedAt = Date.now(); save(); renderHome(); };
   const nudgeExp = document.getElementById("nudge-export"); if(nudgeExp) nudgeExp.onclick = ()=>{ exportData(); renderHome(); };
   const nudgeDis = document.getElementById("nudge-dismiss"); if(nudgeDis) nudgeDis.onclick = ()=>{ state.settings.backupNudgeDismissedAt = Date.now(); save(); renderHome(); };
+  const briefCi = document.getElementById("brief-checkin");
+  if(briefCi) briefCi.onclick = ()=>{
+    const phase = checkinPhaseNow() || (new Date().getHours() >= 17 ? "evening" : "morning");
+    openCheckin(phase, checkinDateKey(phase));
+  };
   const custBtn = document.getElementById("customize-dash-btn"); if(custBtn) custBtn.onclick = openDashboardCustomizeModal;
   const emptyCustBtn = document.getElementById("empty-customize-btn"); if(emptyCustBtn) emptyCustBtn.onclick = openDashboardCustomizeModal;
   const addTaskBtn = document.getElementById("add-task-btn"); if(addTaskBtn) addTaskBtn.onclick = ()=>openTaskModal();
+  bindCaptureBar("home-cap", renderHome);
   const refreshQBtn = document.getElementById("refresh-quote-btn"); if(refreshQBtn) refreshQBtn.onclick = refreshQuote;
   const favQBtn = document.getElementById("fav-quote-btn"); if(favQBtn) favQBtn.onclick = toggleFavQuote;
   root.querySelectorAll("[data-water]").forEach(b=> b.onclick = ()=>{
@@ -1008,10 +1506,8 @@ const DASHBOARD_SECTIONS = [
   {id:"tasks", label:"Today's Tasks", icon:"check-square", zone:"left"},
   {id:"habits", label:"Habits", icon:"repeat", zone:"left"},
   {id:"goals", label:"Goals", icon:"target", zone:"left"},
-  {id:"water", label:"Water Tracker", icon:"droplets", zone:"right"},
-  {id:"mood", label:"Mood Check-in", icon:"smile", zone:"right"},
+  {id:"mood", label:"Energy Check-in", icon:"zap", zone:"right"},
   {id:"focus", label:"Focus Timer", icon:"timer", zone:"right"},
-  {id:"cycle", label:"Cycle Summary", icon:"droplet", zone:"right"},
 ];
 function defaultDashboardLayout(){ return DASHBOARD_SECTIONS.map(s=>({id:s.id, enabled:true})); }
 function getDashboardLayout(){
@@ -1045,7 +1541,7 @@ function renderDashCustList(){
   const listEl = document.getElementById("dash-cust-list");
   if(!listEl) return;
   const layout = getDashboardLayout();
-  const visible = layout.filter(it=> it.id!=="cycle" || cycleEnabled());
+  const visible = layout.filter(it=> DASHBOARD_SECTIONS.some(d=>d.id===it.id));
   listEl.innerHTML = visible.map((item,i)=>{
     const meta = DASHBOARD_SECTIONS.find(s=>s.id===item.id) || {label:item.id, icon:"circle"};
     return `<div class="linkline" data-row="${item.id}">
@@ -1170,14 +1666,79 @@ function pomodoroWidgetHtml(){
       <button class="btn-icon" id="pomo-reset">${icon("rotate-ccw",16)}</button>
     </div>
     <div class="muted" style="font-size:11.5px; margin-top:8px; text-align:center;">Today's focus time: <span class="mono">${todayFocusMinutes()}m</span></div>
-    <div class="muted" style="font-size:11.5px; margin-top:4px; text-align:center;">The timer runs only while My Day Buddy is open. Reminders for scheduled sessions still arrive when it is closed.</div>
+    <div class="muted" style="font-size:11.5px; margin-top:4px; text-align:center;">The countdown keeps real time if you switch away, and the chime arrives even with My Day Buddy closed.</div>
   `;
+}
+/* The timer used to be a setInterval doing `remaining--`, held only in page
+   memory. Three things went wrong with that: a backgrounded WebView throttles
+   timers to about once a minute, so the countdown ran slow the moment you
+   switched apps; swiping the app away killed it outright; and nothing was
+   scheduled with Android, so no chime ever arrived. It now stores the instant
+   it should end and derives the rest from the clock. */
+function pomoTimer(){ return (state.pomodoro && state.pomodoro.timer) || null; }
+function pomoRemainingFromClock(){
+  const t = pomoTimer();
+  if(!t || !t.endsAt) return ui.pomodoro.remaining;
+  return Math.max(0, Math.round((t.endsAt - Date.now())/1000));
+}
+function pomoElapsedFromClock(){
+  const t = pomoTimer();
+  if(!t || !t.startedAt) return ui.pomodoro.elapsedSec || 0;
+  return Math.max(0, Math.round((Date.now() - t.startedAt)/1000));
+}
+function pomoPersist(mode, startedAt, endsAt, activeSessionId){
+  state.pomodoro.timer = {mode:mode, startedAt:startedAt, endsAt:endsAt, activeSessionId:activeSessionId||null};
+}
+function pomoClearPersisted(){ if(state.pomodoro) state.pomodoro.timer = null; }
+/* What the end of a run does, whether the app watched it happen or not. */
+function pomoComplete(mode, activeSessionId, minutesRun, announce){
+  if(mode === "focus"){
+    if(activeSessionId){
+      const sess = state.focusSessions.find(x=>x.id===activeSessionId);
+      if(sess){ sess.completed = true; sess.creditedMin = minutesRun; }
+    }
+  }
+  if(announce){
+    if(mode === "focus") notify("Focus session complete","Nice work. Time for a break.");
+    else notify("Break's over","Ready for another focus session?");
+  }
+}
+/* Called once at startup: pick the run back up, or settle one that ended while
+   the app was closed instead of pretending it never happened. */
+function restorePomodoroTimer(){
+  const t = pomoTimer();
+  if(!t || !t.endsAt){ return; }
+  ui.pomodoro.mode = t.mode || "focus";
+  ui.pomodoro.activeSessionId = t.activeSessionId || null;
+  if(t.endsAt > Date.now()){
+    ui.pomodoro.remaining = pomoRemainingFromClock();
+    pomoStart(true);
+    return;
+  }
+  // it finished while we were away
+  const ranSec = Math.max(0, Math.round((t.endsAt - t.startedAt)/1000));
+  ui.pomodoro.elapsedSec = ranSec;
+  const mins = creditFocusElapsed();
+  pomoComplete(t.mode, t.activeSessionId, mins, false);
+  pomoClearPersisted();
+  ui.pomodoro.activeSessionId = null;
+  ui.pomodoro.mode = t.mode === "focus" ? "break" : "focus";
+  ui.pomodoro.remaining = (ui.pomodoro.mode==="focus"?state.settings.pomodoroFocusMin:state.settings.pomodoroBreakMin)*60;
+  ui.pomodoro.running = false;
+  save();
+  setTimeout(()=>{
+    toast(t.mode==="focus" ? "Your focus session finished while the app was closed" : "Your break finished while the app was closed","timer");
+  }, 900);
 }
 function creditFocusElapsed(){
   const sec = ui.pomodoro.elapsedSec || 0;
   ui.pomodoro.elapsedSec = 0;
   if(ui.pomodoro.mode !== "focus") return 0;
-  const mins = Math.floor(sec/60);
+  /* Leftover seconds used to be discarded on every stop, so four 40-second
+     focus bursts credited zero minutes. They now carry into the next one. */
+  const carried = sec + (state.pomodoro.carrySec || 0);
+  const mins = Math.floor(carried/60);
+  state.pomodoro.carrySec = carried % 60;
   if(mins > 0){
     const dk = todayKey();
     state.pomodoro.sessions[dk] = (state.pomodoro.sessions[dk]||0) + mins;
@@ -1202,27 +1763,28 @@ function mountPomodoroWidget(){
   const rs = root.querySelector("#pomo-reset");
   if(rs) rs.onclick = ()=>{ pomoStop(); ui.pomodoro.activeSessionId=null; ui.pomodoro.remaining = (ui.pomodoro.mode==="focus"?state.settings.pomodoroFocusMin:state.settings.pomodoroBreakMin)*60; refreshFullPomo(); };
 }
-function pomoStart(){
+function pomoStart(resuming){
   ui.pomodoro.running = true;
+  if(!resuming){
+    const now = Date.now();
+    pomoPersist(ui.pomodoro.mode, now, now + ui.pomodoro.remaining*1000, ui.pomodoro.activeSessionId);
+    save(); /* also hands the end-of-session chime to Android's alarm scheduler */
+  }
+  clearInterval(ui.pomodoro.interval);
   ui.pomodoro.interval = setInterval(()=>{
-    ui.pomodoro.remaining--;
-    if(ui.pomodoro.mode === "focus") ui.pomodoro.elapsedSec = (ui.pomodoro.elapsedSec||0) + 1;
+    ui.pomodoro.remaining = pomoRemainingFromClock();
+    if(ui.pomodoro.mode === "focus") ui.pomodoro.elapsedSec = pomoElapsedFromClock();
     if(ui.pomodoro.remaining<=0){
-      pomoStop();
-      if(ui.pomodoro.mode==="focus"){
-        const minutesRun = creditFocusElapsed();
-        if(ui.pomodoro.activeSessionId){
-          const sess = state.focusSessions.find(s=>s.id===ui.pomodoro.activeSessionId);
-          if(sess){ sess.completed = true; sess.creditedMin = minutesRun; }
-          ui.pomodoro.activeSessionId = null;
-        }
-        save();
-        notify("Focus session complete","Nice work. Time for a break.");
-      } else {
-        notify("Break's over","Ready for another focus session?");
-      }
-      ui.pomodoro.remaining = (ui.pomodoro.mode==="focus"?state.settings.pomodoroBreakMin:state.settings.pomodoroFocusMin)*60;
-      ui.pomodoro.mode = ui.pomodoro.mode==="focus"?"break":"focus";
+      const mode = ui.pomodoro.mode, sessionId = ui.pomodoro.activeSessionId;
+      clearInterval(ui.pomodoro.interval);
+      ui.pomodoro.running = false;
+      const minutesRun = creditFocusElapsed();
+      pomoComplete(mode, sessionId, minutesRun, true);
+      pomoClearPersisted();
+      ui.pomodoro.activeSessionId = null;
+      ui.pomodoro.mode = mode==="focus"?"break":"focus";
+      ui.pomodoro.remaining = (ui.pomodoro.mode==="focus"?state.settings.pomodoroFocusMin:state.settings.pomodoroBreakMin)*60;
+      save();
       refreshFullPomo();
       return;
     }
@@ -1232,14 +1794,19 @@ function pomoStart(){
 }
 function pomoStop(){
   ui.pomodoro.running=false; clearInterval(ui.pomodoro.interval);
+  if(pomoTimer()){
+    ui.pomodoro.remaining = pomoRemainingFromClock();
+    ui.pomodoro.elapsedSec = ui.pomodoro.mode === "focus" ? pomoElapsedFromClock() : 0;
+    pomoClearPersisted();
+  }
   const banked = creditFocusElapsed();
   if(banked > 0){
     if(ui.pomodoro.activeSessionId){
       const sess = state.focusSessions.find(s=>s.id===ui.pomodoro.activeSessionId);
       if(sess) sess.creditedMin = (sess.creditedMin||0) + banked;
     }
-    save();
   }
+  save(); /* always, so the cancelled chime is unscheduled too */
   refreshFullPomo();
 }
 function refreshPomoDisplay(){
@@ -1308,6 +1875,12 @@ function openTaskModal(taskId){
         <select id="tf-cat"><option value="">None</option>${catOptions}</select>
       </div>
     </div>
+    <div class="field"><label class="field-label">Matrix box</label>
+      <select id="tf-quad">
+        <option value="">Automatic (from priority and date)</option>
+        ${QUADRANTS.map(q=>`<option value="${q.id}" ${editing&&editing.quadrant===q.id?'selected':''}>${q.label}: ${q.hint.toLowerCase()}</option>`).join("")}
+      </select>
+    </div>
     <div class="field"><label class="field-label">Repeat</label>
       <select id="tf-repeat">
         ${REPEAT_OPTIONS.map(r=>`<option value="${r.id}" ${((editing&&editing.repeat)||'none')===r.id?'selected':''}>${r.label}</option>`).join("")}
@@ -1334,6 +1907,7 @@ function openTaskModal(taskId){
       category: document.getElementById("tf-cat").value,
       reminder: document.getElementById("tf-remind").checked,
       repeat: document.getElementById("tf-repeat").value,
+      quadrant: document.getElementById("tf-quad").value || null,
     };
     if(editing){
       Object.assign(editing, data);
@@ -1351,6 +1925,163 @@ function openTaskModal(taskId){
       });
     };
   }
+}
+
+
+/* =========================================================
+   VIEW: MATRIX (v2). Capture anything into the inbox, sort it
+   with one tap into an Eisenhower box, then work the boxes.
+   Tasks without an explicit box are placed automatically:
+   important = priority medium or high, urgent = due by tomorrow.
+   ========================================================= */
+const QUADRANTS = [
+  {id:"do",    label:"Do now",     hint:"Urgent and important"},
+  {id:"plan",  label:"Plan it",    hint:"Important, not urgent"},
+  {id:"quick", label:"Quick task", hint:"Urgent, but minor"},
+  {id:"drop",  label:"Let it go",  hint:"Neither"},
+];
+const QUAD_EMPTY = {
+  do:"Nothing on fire. Nice.",
+  plan:"Add what matters before it becomes urgent.",
+  quick:"No small stuff waiting.",
+  drop:"Nothing to let go of.",
+};
+function ensureInbox(){ if(!Array.isArray(state.inbox)) state.inbox = []; return state.inbox; }
+function taskQuadrant(t){
+  if(t.quadrant && QUADRANTS.some(q=>q.id===t.quadrant)) return t.quadrant;
+  const today = todayKey();
+  const urgent = taskRepeats(t) ? taskOccursOn(t, today) : (!!t.date && t.date <= addDays(today, 1));
+  const important = t.priority === "high" || t.priority === "med";
+  return important ? (urgent ? "do" : "plan") : (urgent ? "quick" : "drop");
+}
+function matrixTasks(){
+  const today = todayKey();
+  return state.tasks.filter(t => taskRepeats(t) ? (taskOccursOn(t, today) && !taskDoneOn(t, today)) : !t.completed);
+}
+function captureToInbox(title){
+  title = String(title||"").trim().slice(0, 200);
+  if(!title) return false;
+  ensureInbox().push({id:uid(), title, createdAt:Date.now()});
+  save();
+  return true;
+}
+function captureCardHtml(inputId){
+  const n = ensureInbox().length;
+  return `
+    <div style="margin:14px 0 4px;">
+      <div class="cap-bar">
+        <input type="text" id="${inputId}" maxlength="200" placeholder="Capture anything. Sort it later." aria-label="Capture a thought" enterkeyhint="done"/>
+        <button class="btn btn-primary" id="${inputId}-add" aria-label="Add to inbox">${icon("plus",15)} Add</button>
+      </div>
+      <div class="cap-hint"><span>Takes under 2 minutes? Just do it now.</span>${n?`<a href="#" data-route="matrix">Sort inbox (${n})</a>`:""}</div>
+    </div>`;
+}
+function bindCaptureBar(inputId, rerender){
+  const input = document.getElementById(inputId), btn = document.getElementById(inputId+"-add");
+  if(!input || !btn) return;
+  const go = ()=>{
+    if(captureToInbox(input.value)){ toast("In your inbox. Out of your head.", "inbox"); rerender(); }
+    else input.focus();
+  };
+  btn.onclick = go;
+  input.onkeydown = e=>{ if(e.key === "Enter"){ e.preventDefault(); go(); } };
+}
+function sortInboxItem(id, q){
+  const inbox = ensureInbox();
+  const it = inbox.find(x=>x.id===id);
+  if(!it) return;
+  state.inbox = inbox.filter(x=>x.id!==id);
+  if(q === "drop"){
+    state.settings.letGoCount = (state.settings.letGoCount||0) + 1;
+    toast("Let go. One less thing to carry.", "feather");
+  } else {
+    state.tasks.push({
+      id:uid(), title:it.title, description:"",
+      date: q==="plan" ? addDays(todayKey(), 1) : todayKey(), time:"",
+      priority: (q==="do" || q==="plan") ? "high" : "low",
+      category:"", completed:false, completions:{}, reminder:false, repeat:"none", quadrant:q,
+    });
+    const qq = QUADRANTS.find(x=>x.id===q);
+    toast(q==="plan" ? "Planned for tomorrow. Tap it to pick a time." : "Added to "+qq.label, "check");
+  }
+  save(); renderMatrix();
+}
+function mxItemHtml(t){
+  const today = todayKey();
+  let meta = "";
+  if(taskRepeats(t)) meta = "Repeats";
+  else if(t.date && t.date < today) meta = "Overdue";
+  else if(t.date === today) meta = "Today";
+  else if(t.date === addDays(today,1)) meta = "Tomorrow";
+  else if(t.date) meta = fmtDateLong(t.date);
+  if(t.time) meta += " · " + t.time;
+  return `<div class="mx-item">
+    <input type="checkbox" data-mx-done="${t.id}" aria-label="Mark ${escapeHtml(t.title)} done"/>
+    <button class="mx-t" data-mx-edit="${t.id}">${escapeHtml(t.title)}${meta?`<small>${escapeHtml(meta)}</small>`:""}</button>
+  </div>`;
+}
+function renderMatrix(){
+  const root = document.getElementById("view-root");
+  const inbox = ensureInbox();
+  const by = {do:[], plan:[], quick:[], drop:[]};
+  matrixTasks().forEach(t=> by[taskQuadrant(t)].push(t));
+  Object.values(by).forEach(list=> list.sort((a,b)=> ((a.date||"")+(a.time||"99:99")).localeCompare((b.date||"")+(b.time||"99:99"))));
+  const first = inbox[0];
+  const box = q => {
+    const list = by[q.id];
+    return `<div class="mx-box q-${q.id}">
+      <div class="mx-head"><span class="mx-name">${q.label}</span><span class="mono" style="font-size:12.5px;">${list.length}</span></div>
+      <div class="mx-hint">${q.hint}</div>
+      ${list.length ? list.map(mxItemHtml).join("") : `<div class="mx-empty">${QUAD_EMPTY[q.id]}</div>`}
+      ${q.id==="drop" && list.length ? `<div class="mx-letgo"><button class="btn btn-ghost" id="mx-letgo-all" style="width:100%; font-size:12.5px;">Let go of all ${list.length}</button></div>` : ""}
+    </div>`;
+  };
+  let note = "";
+  if(by.do.length >= 3 && by.do.length > by.plan.length + 1){
+    note = `A lot is urgent right now. Once it's cleared, give <b>Plan it</b> your best hours so fewer things become emergencies.`;
+  } else if(by.plan.length && !by.do.length){
+    note = `Nothing urgent. This is the perfect time for <b>Plan it</b>: start with "${escapeHtml(by.plan[0].title)}".`;
+  }
+  root.innerHTML = `
+    <div class="hero"><div><h1>Matrix</h1><div class="sub">Clear your head. Sort one thing at a time.</div></div></div>
+    ${captureCardHtml("mx-cap")}
+    ${first ? `
+    <div class="sort-card" role="group" aria-label="Sort inbox item">
+      <div class="sort-eyebrow"><span>Where does this go?</span><span>Inbox ${1} of ${inbox.length}</span></div>
+      <div class="sort-title">${escapeHtml(first.title)}</div>
+      <div class="sort-grid">
+        ${QUADRANTS.map(q=>`<button class="sort-btn q-${q.id}" data-sort="${q.id}"><b>${q.label}</b><span>${q.hint}</span></button>`).join("")}
+      </div>
+      <div class="sort-foot"><span>One tap. You can change it later.</span>${inbox.length>1?`<button id="mx-skip">Skip for now</button>`:""}</div>
+    </div>` : (state.tasks.length ? `<div class="cap-hint" style="margin-top:2px;"><span>Inbox clear. Your head can rest.</span></div>` : "")}
+    <div class="section-title" style="margin-top:22px;"><h2>Your matrix</h2><span class="muted" style="font-size:12.5px;">Protect the blue box</span></div>
+    <div class="mx-grid">${QUADRANTS.map(box).join("")}</div>
+    ${note ? `<div class="mx-note">${note}</div>` : ""}
+  `;
+  root.querySelectorAll("[data-route]").forEach(a=>a.onclick=(e)=>{e.preventDefault(); setRoute(a.dataset.route);});
+  bindCaptureBar("mx-cap", renderMatrix);
+  if(first){
+    root.querySelectorAll("[data-sort]").forEach(b=> b.onclick = ()=> sortInboxItem(first.id, b.dataset.sort));
+    const skip = document.getElementById("mx-skip");
+    if(skip) skip.onclick = ()=>{ state.inbox = inbox.slice(1).concat([first]); save(); renderMatrix(); };
+  }
+  root.querySelectorAll("[data-mx-done]").forEach(cb=> cb.onchange = ()=>{
+    const t = state.tasks.find(x=>x.id===cb.dataset.mxDone); if(!t) return;
+    setTaskDone(t, todayKey(), true); save();
+    toast("Done. Nice work.", "check");
+    setTimeout(renderMatrix, 220);
+  });
+  root.querySelectorAll("[data-mx-edit]").forEach(b=> b.onclick = ()=> openTaskModal(b.dataset.mxEdit));
+  const letGo = document.getElementById("mx-letgo-all");
+  if(letGo) letGo.onclick = ()=>{
+    const ids = new Set(by.drop.map(t=>t.id));
+    confirmAction("Let go of "+ids.size+" task"+(ids.size===1?"":"s")+"?", "They'll be removed. Not everything deserves your time.", ()=>{
+      state.tasks = state.tasks.filter(t=> !ids.has(t.id));
+      state.settings.letGoCount = (state.settings.letGoCount||0) + ids.size;
+      save(); renderMatrix(); toast("Lighter already.", "feather");
+    });
+  };
+  mountIcons();
 }
 
 /* =========================================================
@@ -1408,6 +2139,10 @@ function openHabitModal(habitId){
         ${HABIT_ICONS.map(ic=>`<button class="btn-icon" data-picon="${ic}" style="${editing&&editing.icon===ic || (!editing && ic===HABIT_ICONS[0]) ?'background:var(--accent-soft);color:var(--accent);border-color:var(--accent);':''}">${icon(ic,17)}</button>`).join("")}
       </div>
     </div>
+    <div class="field"><label class="field-label">Reminder time (optional)</label>
+      <input type="time" id="hf-time" value="${editing&&editing.time?escapeHtml(editing.time):''}" />
+      <p class="muted" style="font-size:11.5px; margin-top:5px;">Leave blank for no reminder. Needs "Habit reminders" switched on in Settings.</p>
+    </div>
     <div class="row" style="margin-top:6px;">
       ${editing?`<button class="btn btn-danger" id="hf-delete">Delete</button>`:""}
       <button class="btn btn-primary" id="hf-save" style="flex:2;">${editing?"Save":"Add Habit"}</button>
@@ -1422,8 +2157,10 @@ function openHabitModal(habitId){
   document.getElementById("hf-save").onclick = ()=>{
     const name = document.getElementById("hf-name").value.trim();
     if(!name){ toast("Give the habit a name"); return; }
-    if(editing){ editing.name=name; editing.icon=selectedIcon; toast("Habit updated","check"); }
-    else{ state.habits.push({id:uid(), name, icon:selectedIcon, createdAt:todayKey()}); toast("Habit added","plus"); }
+    const timeEl = document.getElementById("hf-time");
+    const hTime = timeEl && /^\d{2}:\d{2}$/.test(timeEl.value) ? timeEl.value : null;
+    if(editing){ editing.name=name; editing.icon=selectedIcon; editing.time=hTime; toast("Habit updated","check"); }
+    else{ state.habits.push({id:uid(), name, icon:selectedIcon, time:hTime, createdAt:todayKey()}); toast("Habit added","plus"); }
     save(); closeModal(); rerenderCurrent();
   };
   if(editing){
@@ -1779,6 +2516,27 @@ async function mediaGet(id){
     req.onerror = ()=>reject(req.error);
   });
 }
+async function mediaAllIds(){
+  const db = await openMediaDb();
+  return new Promise((resolve,reject)=>{
+    const tx = db.transaction(MEDIA_STORE, "readonly");
+    const req = tx.objectStore(MEDIA_STORE).getAllKeys();
+    req.onsuccess = ()=>resolve(req.result || []);
+    req.onerror = ()=>reject(req.error);
+  });
+}
+/* One-time sweep for blobs earlier versions left behind when an entry was
+   deleted. Only runs against ids nothing references any more. */
+async function sweepOrphanedMedia(){
+  try{
+    const referenced = new Set(allReferencedMediaIds(state));
+    const stored = await mediaAllIds();
+    const orphans = stored.filter(id=> typeof id === "string" && !referenced.has(id));
+    if(!orphans.length) return 0;
+    for(const id of orphans){ try{ await mediaDelete(id); }catch(e){} }
+    return orphans.length;
+  }catch(e){ return 0; }
+}
 async function mediaDelete(id){
   const db = await openMediaDb();
   return new Promise((resolve,reject)=>{
@@ -1894,6 +2652,76 @@ async function verifyDeviceUnlock(){
 /* =========================================================
    VIEW: JOURNAL  (free-form daily writing, separate from Reflection)
    ========================================================= */
+/* PIN storage.
+   A 4 to 6 digit PIN has at most a million values, so a bare SHA-256 of it is
+   read off a rainbow table in no time. Each PIN now gets its own random salt
+   and 200k rounds of PBKDF2, which turns a full sweep into days rather than
+   milliseconds. Hashes written by older versions still open the journal, and
+   are quietly upgraded the first time they are used. */
+const PIN_KDF_ITERATIONS = 200000;
+function b64(bytes){ let s=""; for(const b of bytes) s += String.fromCharCode(b); return btoa(s); }
+function unb64(str){ const bin = atob(str); const out = new Uint8Array(bin.length); for(let i=0;i<bin.length;i++) out[i]=bin.charCodeAt(i); return out; }
+function strongCryptoAvailable(){
+  return !!(window.crypto && window.crypto.subtle && window.crypto.getRandomValues && window.isSecureContext);
+}
+async function pbkdf2Hex(pin, saltBytes, iterations){
+  const key = await crypto.subtle.importKey("raw", new TextEncoder().encode(pin), "PBKDF2", false, ["deriveBits"]);
+  const bits = await crypto.subtle.deriveBits({name:"PBKDF2", salt:saltBytes, iterations:iterations, hash:"SHA-256"}, key, 256);
+  return b64(new Uint8Array(bits));
+}
+/* Compares without leaking, through timing, how much of the value matched. */
+function constantTimeEqual(a, b){
+  a = String(a); b = String(b);
+  if(a.length !== b.length) return false;
+  let diff = 0;
+  for(let i=0;i<a.length;i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+async function hashPin(pin){
+  if(strongCryptoAvailable()){
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const hash = await pbkdf2Hex(pin, salt, PIN_KDF_ITERATIONS);
+    return "pbkdf2$" + PIN_KDF_ITERATIONS + "$" + b64(salt) + "$" + hash;
+  }
+  // Insecure context (a preview frame, file://). The lock is cosmetic there
+  // anyway, because the data sitting behind it is readable without it.
+  return await sha256Hex(pin);
+}
+async function verifyPin(pin, stored){
+  if(!stored) return false;
+  if(String(stored).indexOf("pbkdf2$") === 0){
+    const parts = String(stored).split("$");
+    if(parts.length !== 4) return false;
+    const iterations = parseInt(parts[1],10);
+    if(!(iterations > 0 && iterations <= 2000000)) return false;
+    try{
+      const candidate = await pbkdf2Hex(pin, unb64(parts[2]), iterations);
+      return constantTimeEqual(candidate, parts[3]);
+    }catch(e){ return false; }
+  }
+  // legacy: unsalted SHA-256, or the non-crypto fallback
+  const legacy = await sha256Hex(pin);
+  if(constantTimeEqual(legacy, stored)) return true;
+  return constantTimeEqual(simplePinHash(pin), stored);
+}
+/* Slows a hand-typed brute force to a crawl without ever locking someone out
+   of their own journal for good. */
+function pinLockRemainingMs(){
+  const until = state.settings.journalPinLockUntil || 0;
+  return Math.max(0, until - Date.now());
+}
+function notePinFailure(){
+  const n = (state.settings.journalPinAttempts || 0) + 1;
+  state.settings.journalPinAttempts = n;
+  if(n >= 5) state.settings.journalPinLockUntil = Date.now() + Math.min(5*60000, 15000 * Math.pow(2, n-5));
+  save();
+}
+function clearPinFailures(){
+  state.settings.journalPinAttempts = 0;
+  state.settings.journalPinLockUntil = 0;
+  save();
+}
+
 async function sha256Hex(str){
   // Prefer real SHA-256 when available, but this only works in secure contexts
   // (https/localhost). Fall back to a simple sync hash everywhere else so the
@@ -1975,7 +2803,8 @@ function openJournalPinModal(enableAfter){
     if(!/^\d{4,6}$/.test(a)){ errEl.textContent = "PIN must be 4 to 6 digits."; return; }
     if(a!==b){ errEl.textContent = "PINs don't match."; return; }
     try{
-      state.settings.journalPinHash = await sha256Hex(a);
+      state.settings.journalPinHash = await hashPin(a);
+      clearPinFailures();
       if(enableAfter) state.settings.journalLockEnabled = true;
       ui.journalUnlocked = true;
       save(); closeModal(); toast("PIN saved","lock"); rerenderCurrent();
@@ -2025,12 +2854,26 @@ function renderJournalLockScreen(){
     const submit = async ()=>{
       const val = input.value.trim();
       if(!val) return;
+      const waitMs = pinLockRemainingMs();
+      if(waitMs > 0){
+        document.getElementById("journal-pin-error").textContent =
+          "Too many attempts. Try again in " + Math.ceil(waitMs/1000) + "s.";
+        input.value=""; return;
+      }
       try{
-        const hash = await sha256Hex(val);
-        if(hash === state.settings.journalPinHash){
+        if(await verifyPin(val, state.settings.journalPinHash)){
+          clearPinFailures();
+          // silently move an old unsalted hash onto the stronger scheme
+          if(String(state.settings.journalPinHash).indexOf("pbkdf2$") !== 0){
+            try{ state.settings.journalPinHash = await hashPin(val); save(); }catch(e){}
+          }
           ui.journalUnlocked = true; renderJournal();
         } else {
-          document.getElementById("journal-pin-error").textContent = "Incorrect PIN, try again.";
+          notePinFailure();
+          const nowWait = pinLockRemainingMs();
+          document.getElementById("journal-pin-error").textContent = nowWait > 0
+            ? "Too many attempts. Try again in " + Math.ceil(nowWait/1000) + "s."
+            : "Incorrect PIN, try again.";
           input.value=""; input.focus();
         }
       }catch(e){
@@ -2154,7 +2997,7 @@ function bindJournalTodayEvents(root, dateKey){
     if(id){ mediaDelete(id).catch(()=>{}); const url = mediaUrlCache.get(id); if(url){ URL.revokeObjectURL(url); mediaUrlCache.delete(id); } }
   });
   root.querySelectorAll("[data-view-image]").forEach(img=> img.onclick = ()=>{
-    openModal(`<div class="modal-head"><h3>Photo</h3><button class="icon-btn-plain" onclick="__closeModal()">${icon("x",20)}</button></div><img src="${img.src}" style="width:100%; border-radius:14px;"/>`);
+    openModal(`<div class="modal-head"><h3>Photo</h3><button class="icon-btn-plain" onclick="__closeModal()">${icon("x",20)}</button></div><img src="${escapeHtml(img.src)}" style="width:100%; border-radius:14px;"/>`);
   });
   const voiceBtn = root.querySelector("#journal-voice-btn");
   if(voiceBtn) voiceBtn.onclick = ()=> toggleVoiceRecording(dateKey, voiceBtn);
@@ -2240,8 +3083,18 @@ function openJournalEntryModal(dateKey){
     save(); closeModal(); rerenderCurrent(); toast("Entry updated","check");
   };
   document.getElementById("jm-delete").onclick = ()=>{
-    confirmAction("Delete this entry?","This can't be undone.", ()=>{
-      delete state.journal.entries[dateKey]; save(); closeModal(); rerenderCurrent();
+    confirmAction("Delete this entry?","This can't be undone. Its photos and voice notes go with it.", ()=>{
+      const entry = state.journal.entries[dateKey] || {};
+      const orphans = [].concat(entry.images||[], entry.voiceNotes||[]).filter(Boolean);
+      delete state.journal.entries[dateKey];
+      save(); closeModal(); rerenderCurrent();
+      /* Without this the blobs stayed on the device forever, unreachable and
+         uncountable, quietly eating storage. */
+      orphans.forEach(id=>{
+        mediaDelete(id).catch(()=>{});
+        const url = mediaUrlCache.get(id);
+        if(url){ try{ URL.revokeObjectURL(url); }catch(e){} mediaUrlCache.delete(id); }
+      });
     });
   };
 }
@@ -2584,18 +3437,21 @@ function renderHealth(){
     <div class="grid grid-2" style="margin-top:18px;">
       <div class="card">
         <div style="font-weight:700; font-size:14px; margin-bottom:10px; display:flex; align-items:center; gap:6px;">${icon("moon",16)} Sleep</div>
-        <div style="display:flex; align-items:baseline; gap:6px; margin-bottom:10px;">
-          <input type="number" min="0" max="16" step="0.5" id="sleep-input" value="${sleepHrs}" style="width:90px; font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700;">
-          <span class="muted">/ ${state.settings.sleepGoalHrs}h goal</span>
-        </div>
+        <input type="number" min="0" max="16" step="0.5" id="sleep-input" value="${sleepHrs}" style="width:100%; font-family:'JetBrains Mono',monospace; font-size:18px; font-weight:700;">
+        <div class="muted" style="font-size:12px; margin:6px 0 10px;">of ${state.settings.sleepGoalHrs}h goal</div>
         <div class="bar"><span style="width:${clamp(sleepHrs/state.settings.sleepGoalHrs*100,0,100)}%"></span></div>
       </div>
 
       <div class="card">
         <div style="font-weight:700; font-size:14px; margin-bottom:10px; display:flex; align-items:center; gap:6px;">${icon("droplets",16)} Water</div>
-        <div class="mono" style="font-size:18px; font-weight:700; margin-bottom:10px;">${waterVal} <span class="muted" style="font-size:13px; font-weight:500;">/ ${state.settings.waterGoalMl}ml</span></div>
+        <div class="mono" style="font-size:18px; font-weight:700;">${waterVal}</div>
+        <div class="muted" style="font-size:12px; margin:2px 0 10px;">of ${state.settings.waterGoalMl}ml</div>
         <div class="bar" style="margin-bottom:12px;"><span style="width:${clamp(waterVal/state.settings.waterGoalMl*100,0,100)}%"></span></div>
-        <div class="row"><button class="btn btn-ghost" data-water="250">+250ml</button><button class="btn btn-ghost" data-water="500">+500ml</button></div>
+        <div class="row" style="gap:6px;">
+          <button class="btn btn-ghost" data-water="250" style="flex:1; min-width:0; padding:10px 6px; font-size:13px;">+250</button>
+          <button class="btn btn-ghost" data-water="500" style="flex:1; min-width:0; padding:10px 6px; font-size:13px;">+500</button>
+        </div>
+        <div class="muted" style="font-size:11px; text-align:center; margin-top:6px;">millilitres</div>
       </div>
     </div>
 
@@ -2620,18 +3476,18 @@ function renderHealth(){
     <div class="section-title"><h2>Focus / Study</h2></div>
     <div class="card">${pomodoroWidgetHtml()}</div>
 
-    <div class="section-title"><h2>Medicines &amp; Supplements</h2><button class="btn btn-soft" id="add-med-btn">${icon("plus",15)} Add</button></div>
+    <div class="section-title"><h2>Daily reminders</h2><button class="btn btn-soft" id="add-med-btn">${icon("plus",15)} Add</button></div>
     <div class="card">
       ${meds.length? meds.map(m=>`
         <div class="item-row">
           <div class="checkbox ${medLog[m.id]?'done':''}" data-med-toggle="${m.id}">${medLog[m.id]?icon("check",13):""}</div>
           <div style="flex:1;">
             <div class="item-title ${medLog[m.id]?'done':''}">${escapeHtml(m.name)}</div>
-            <div class="item-meta"><span>${escapeHtml(m.dosage||"")}</span>${m.time?`<span>${icon("clock",11)} ${fmtTime12(m.time)}</span>`:""}</div>
+            <div class="item-meta">${m.time?`<span>${icon("clock",11)} ${fmtTime12(m.time)}</span>`:""}</div>
           </div>
           <button class="icon-btn-plain" data-del-med="${m.id}">${icon("trash-2",15)}</button>
         </div>
-      `).join("") : emptyState("pill","No medicines added","Add one to track daily intake. This app does not provide medical advice.")}
+      `).join("") : emptyState("bell","Nothing here yet","Add something you want to be reminded of at the same time each day.")}
     </div>
 
     <div class="section-title"><h2>Daily Reflection</h2></div>
@@ -2660,7 +3516,7 @@ function renderHealth(){
     save(); renderHealth();
   });
   root.querySelectorAll("[data-del-med]").forEach(b=> b.onclick = ()=>{
-    confirmAction("Delete medicine?","This removes it from your list.", ()=>{
+    confirmAction("Delete this reminder?","This removes it from your list.", ()=>{
       state.medicines = state.medicines.filter(m=>m.id!==b.dataset.delMed); save(); renderHealth();
     });
   });
@@ -2686,19 +3542,18 @@ function openWorkoutModal(){
 }
 function openMedModal(){
   openModal(`
-    <div class="modal-head"><h3>Add Medicine / Supplement</h3><button class="icon-btn-plain" onclick="__closeModal()">${icon("x",20)}</button></div>
-    <div class="field"><label class="field-label">Name</label><input type="text" id="mf-name" placeholder="e.g. Vitamin D"/></div>
-    <div class="field"><label class="field-label">Dosage / instructions</label><input type="text" id="mf-dosage" placeholder="e.g. 1 tablet after breakfast"/></div>
+    <div class="modal-head"><h3>Add a daily reminder</h3><button class="icon-btn-plain" onclick="__closeModal()">${icon("x",20)}</button></div>
+    <div class="field"><label class="field-label">What is it</label><input type="text" id="mf-name" placeholder="e.g. Stretch, water the plants"/></div>
     <div class="field"><label class="field-label">Time</label><input type="time" id="mf-time"/></div>
-    <p class="muted" style="font-size:12px;">This app stores your own notes only and does not provide medical advice.</p>
+    <p class="muted" style="font-size:12px;">Repeats every day until you remove it. My Day Buddy keeps your own notes and gives no advice of any kind.</p>
     <button class="btn btn-primary" id="mf-save" style="width:100%;">Add</button>
   `);
   document.getElementById("mf-save").onclick = ()=>{
     const name = document.getElementById("mf-name").value.trim();
     if(!name){ toast("Enter a name"); return; }
     const t = document.getElementById("mf-time").value;
-    state.medicines.push({id:uid(), name, dosage:document.getElementById("mf-dosage").value.trim(), time:t});
-    save(); closeModal(); rerenderCurrent(); toast("Added","pill");
+    state.medicines.push({id:uid(), name, dosage:"", time:t});
+    save(); closeModal(); rerenderCurrent(); toast("Added","bell");
     if(t) ensureNotifPermission();
   };
 }
@@ -2741,9 +3596,19 @@ function cyc(){
   if(!state.cycle.logs || typeof state.cycle.logs!=="object") state.cycle.logs = {};
   return state.cycle;
 }
-function cycleEnabled(){ return !!(state.settings && state.settings.cycleTrackingEnabled); }
-function navItems(){ return NAV_ITEMS.filter(n=> n.id!=="cycle" || cycleEnabled()); }
-function moreSheetItems(){ return MORE_SHEET_ITEMS.filter(id=> id!=="cycle" || cycleEnabled()); }
+function cycleEnabled(){ return false; } /* v2: cycle tracking removed; old data kept in storage + backups */
+/* Health is off for a new install and stays on for anyone already using it -
+   hiding a section someone has data in would be a regression, not a tidy-up.
+   Note it also holds the daily reminder list, which is why the toggle says so. */
+function healthEnabled(){ return false; } /* v2: health, medicines and the daily list removed */
+function hasAnyHealthData(){
+  return Object.keys(state.health.sleepLogs||{}).length > 0
+      || (state.workouts||[]).length > 0
+      || (state.medicines||[]).length > 0
+      || Object.keys(state.mood.logs||{}).length > 0;
+}
+function navItems(){ return NAV_ITEMS.filter(n=> (n.id!=="cycle" || cycleEnabled()) && (n.id!=="health" || healthEnabled())); }
+function moreSheetItems(){ return MORE_SHEET_ITEMS.filter(id=> (id!=="cycle" || cycleEnabled()) && (id!=="health" || healthEnabled())); }
 
 function daysBetween(a,b){
   const [y1,m1,d1]=a.split("-").map(Number), [y2,m2,d2]=b.split("-").map(Number);
@@ -3206,9 +4071,7 @@ function dayHasActivity(key){
   if(!key) return false;
   if(tasksForDate(key).some(t=>taskDoneOn(t,key))) return true;
   if(state.habitLogs[key] && Object.values(state.habitLogs[key]).some(Boolean)) return true;
-  if(state.water.logs[key]>0) return true;
   if(state.mood.logs[key]) return true;
-  if(state.workouts.some(w=>w.date===key)) return true;
   return false;
 }
 function renderCalDetail(){
@@ -3228,11 +4091,11 @@ function renderCalDetail(){
       <div class="grid grid-2" style="gap:10px; margin-bottom:14px;">
         <div class="card-tight" style="background:var(--bg-soft); border-radius:14px;"><div class="muted" style="font-size:11px;">Tasks done</div><div class="mono" style="font-weight:700; font-size:16px;">${dayTasks.filter(t=>taskDoneOn(t,key)).length}/${dayTasks.length}</div></div>
         <div class="card-tight" style="background:var(--bg-soft); border-radius:14px;"><div class="muted" style="font-size:11px;">Habits done</div><div class="mono" style="font-weight:700; font-size:16px;">${habitsDone.length}/${state.habits.length}</div></div>
-        <div class="card-tight" style="background:var(--bg-soft); border-radius:14px;"><div class="muted" style="font-size:11px;">Water</div><div class="mono" style="font-weight:700; font-size:16px;">${water}ml</div></div>
+        
         <div class="card-tight" style="background:var(--bg-soft); border-radius:14px;"><div class="muted" style="font-size:11px;">Focus time</div><div class="mono" style="font-weight:700; font-size:16px;">${focusMin}m</div></div>
       </div>
-      <div style="margin-bottom:10px;"><span class="muted" style="font-size:12.5px;">Mood: </span>${moodObj?`<span>${moodObj.emoji} ${moodObj.label}</span>`:'<span class="muted">Not logged</span>'}</div>
-      <div style="margin-bottom:10px;"><span class="muted" style="font-size:12.5px;">Workout: </span>${workout?`<span>${escapeHtml(workout.type)} · ${workout.duration}m</span>`:'<span class="muted">None logged</span>'}</div>
+      <div style="margin-bottom:10px;"><span class="muted" style="font-size:12.5px;">Energy: </span>${moodObj?`<span>${moodObj.emoji} ${moodObj.label}</span>`:'<span class="muted">Not logged</span>'}</div>
+      <div style="display:none"><span class="muted" style="font-size:12.5px;">Workout: </span>${workout?`<span>${escapeHtml(workout.type)} · ${workout.duration}m</span>`:'<span class="muted">None logged</span>'}</div>
       ${cycleEnabled()? (()=>{ const cd=cycleDayFor(key), ph=cyclePhase(key), lg=cycleLogFor(key), fl=flowMeta(lg.flow);
         return `<div style="margin-bottom:10px;"><span class="muted" style="font-size:12.5px;">Cycle: </span>${cd? `<span>Day ${cd}${ph?" · "+ph.label:""}${fl?" · "+fl.label+" flow":""}</span>` : '<span class="muted">No data</span>'}${(lg.symptoms||[]).length?`<div class="muted" style="font-size:12px; margin-top:3px;">${escapeHtml((lg.symptoms||[]).join(", "))}</div>`:""}</div>`;
       })() : ""}
@@ -3280,7 +4143,7 @@ function weeklyReportCardHtml(){
   if(habitBest && habitStreak(habitBest.id,todayKey())>0){
     narrative += ` Your strongest streak is <strong>${escapeHtml(habitBest.name)}</strong> at ${habitStreak(habitBest.id,todayKey())} days.`;
   }
-  narrative += cur.workoutDays>0 ? ` You worked out ${cur.workoutDays} day${cur.workoutDays===1?'':'s'} this week.` : ` No workouts logged this week yet.`;
+  narrative += cur.focusTotal>0 ? ` You focused for ${Math.round(cur.focusTotal/60*10)/10} hours.` : ` No focus sessions yet this week.`;
   return `
   <div class="card" style="margin-top:18px; background:linear-gradient(155deg,var(--accent-soft),var(--card));">
     <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
@@ -3288,7 +4151,7 @@ function weeklyReportCardHtml(){
       <span class="muted" style="font-size:11.5px;">${fmtDateLong(lastNDays(7)[0])} to ${fmtDateLong(todayKey())}</span>
     </div>
     <p style="font-size:14px; line-height:1.6; margin:0 0 14px;">${narrative}</p>
-    <div class="grid grid-3" style="gap:10px;">
+    <div class="grid grid-2" style="gap:10px;">
       <div class="card-tight" style="background:var(--card); border-radius:14px;">
         <div class="muted" style="font-size:11px;">Completion</div>
         <div style="display:flex; align-items:baseline; gap:6px;"><span class="mono" style="font-weight:700; font-size:17px;">${cur.completion}%</span>${trendArrow(cur.completion,prev.completion)}</div>
@@ -3297,7 +4160,7 @@ function weeklyReportCardHtml(){
         <div class="muted" style="font-size:11px;">Habit consistency</div>
         <div style="display:flex; align-items:baseline; gap:6px;"><span class="mono" style="font-weight:700; font-size:17px;">${cur.habitRate}%</span>${trendArrow(cur.habitRate,prev.habitRate)}</div>
       </div>
-      <div class="card-tight" style="background:var(--card); border-radius:14px;">
+      <div class="card-tight" style="display:none">
         <div class="muted" style="font-size:11px;">Avg water</div>
         <div style="display:flex; align-items:baseline; gap:6px;"><span class="mono" style="font-weight:700; font-size:17px;">${cur.waterAvg}ml</span>${trendArrow(cur.waterAvg,prev.waterAvg)}</div>
       </div>
@@ -3305,12 +4168,12 @@ function weeklyReportCardHtml(){
         <div class="muted" style="font-size:11px;">Focus time</div>
         <div style="display:flex; align-items:baseline; gap:6px;"><span class="mono" style="font-weight:700; font-size:17px;">${Math.round(cur.focusTotal/60*10)/10}h</span>${trendArrow(cur.focusTotal,prev.focusTotal)}</div>
       </div>
-      <div class="card-tight" style="background:var(--card); border-radius:14px;">
+      <div class="card-tight" style="display:none">
         <div class="muted" style="font-size:11px;">Workout days</div>
         <div style="display:flex; align-items:baseline; gap:6px;"><span class="mono" style="font-weight:700; font-size:17px;">${cur.workoutDays}/7</span>${trendArrow(cur.workoutDays,prev.workoutDays)}</div>
       </div>
       <div class="card-tight" style="background:var(--card); border-radius:14px;">
-        <div class="muted" style="font-size:11px;">Avg mood</div>
+        <div class="muted" style="font-size:11px;">Avg energy</div>
         <div style="display:flex; align-items:baseline; gap:6px;"><span class="mono" style="font-weight:700; font-size:17px;">${cur.moodAvg!==null?cur.moodAvg+'/5':'n/a'}</span>${trendArrow(cur.moodAvg,prev.moodAvg)}</div>
       </div>
     </div>
@@ -3338,7 +4201,7 @@ function renderInsights(){
 
     <div class="grid grid-3" style="margin-top:18px;">
       <div class="card card-tight"><div class="muted" style="font-size:11.5px;">Weekly completion</div><div class="display" style="font-size:26px;">${overallWeekCompletion}%</div></div>
-      <div class="card card-tight"><div class="muted" style="font-size:11.5px;">Workout days</div><div class="display" style="font-size:26px;">${workoutDays}/7</div></div>
+      <div class="card card-tight" style="display:none"><div class="muted" style="font-size:11.5px;">Workout days</div><div class="display" style="font-size:26px;">${workoutDays}/7</div></div>
       <div class="card card-tight"><div class="muted" style="font-size:11.5px;">Focus time (7d)</div><div class="display" style="font-size:26px;">${Math.round(focusSeries.reduce((a,b)=>a+b,0)/60*10)/10}h</div></div>
     </div>
 
@@ -3348,7 +4211,7 @@ function renderInsights(){
           <div style="font-weight:700; font-size:14px; margin-bottom:14px;">Daily completion rate</div>
           ${barChart(week, completionSeries, "%")}
         </div>
-        <div class="card" style="margin-bottom:16px;">
+        <div class="card" style="display:none">
           <div style="font-weight:700; font-size:14px; margin-bottom:14px;">Water consistency</div>
           ${barChart(week, waterSeries, "%")}
         </div>
@@ -3359,7 +4222,7 @@ function renderInsights(){
       </div>
       <div>
         <div class="card" style="margin-bottom:16px;">
-          <div style="font-weight:700; font-size:14px; margin-bottom:14px;">Mood trend</div>
+          <div style="font-weight:700; font-size:14px; margin-bottom:14px;">Energy trend</div>
           ${moodLineChart(week, moodSeries)}
         </div>
         <div class="card" style="margin-bottom:16px;">
@@ -3420,20 +4283,30 @@ function renderSettings(){
     <div class="card">
       <div class="field"><label class="field-label">Name</label><input type="text" id="st-name" value="${escapeHtml(u.name)}"/></div>
       <div class="field"><label class="field-label">Avatar</label>
-        <div style="display:flex; gap:8px; flex-wrap:wrap;">
-          ${["🌿","🌸","☀️","🌙","🔥","🐣","🌊","⭐","🍃","🦋"].map(e=>`<button class="btn-icon" data-avatar="${e}" style="font-size:17px; ${u.avatarEmoji===e?'background:var(--accent-soft);border-color:var(--accent);':''}">${e}</button>`).join("")}
+        <div style="display:flex; gap:var(--s2); flex-wrap:wrap; align-items:center;">
+          ${["🌿","🌸","☀️","🌙","🔥","🐣","🌊","⭐","🍃","🦋"].map(e=>`<button class="btn-icon" data-avatar="${e}" style="font-size:19px; ${u.avatarEmoji===e?'background:var(--accent-soft);border-color:var(--accent);':''}">${e}</button>`).join("")}
+          <input type="text" id="st-avatar-custom" value="${escapeHtml(u.avatarEmoji||"")}" inputmode="text" autocomplete="off"
+                 aria-label="Any emoji or letter"
+                 style="width:var(--tap); height:var(--tap); padding:0; text-align:center; font-size:19px; flex-shrink:0;"/>
         </div>
+        <p class="muted" style="font-size:var(--t-xs); margin:var(--s2) 0 0;">Or type your own &mdash; tap the box and use the emoji key on your keyboard. Any single emoji or letter works.</p>
       </div>
     </div>
 
-    <div class="section-title"><h2>You</h2></div>
-    <div class="card">
+    <div class="section-title" style="display:none"><h2>You</h2></div>
+    <div class="card" style="display:none">
       <div class="field">
         <label class="field-label">Gender</label>
         <div class="chip-row">
           ${GENDERS.map(g=>`<button class="chip ${u.gender===g.id?'on':''}" data-gender="${g.id}">${g.label}</button>`).join("")}
         </div>
         <p class="muted" style="font-size:11.5px; margin:8px 0 0;">Only used to decide which trackers to offer you. Stored on this device like everything else.</p>
+      </div>
+      <div class="linkline">
+        <span style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:13.5px;">${icon("heart-pulse",16)} Health section
+          <span class="ll-sub" style="font-weight:400;">Sleep, workouts and your daily reminders.</span>
+        </span>
+        <label class="switch"><input type="checkbox" id="st-health-on" ${s.healthEnabled?'checked':''}/><span class="slider"></span></label>
       </div>
       <div class="linkline">
         <span style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:13.5px;">${icon("droplet",16)} Track menstrual cycle</span>
@@ -3478,7 +4351,7 @@ function renderSettings(){
 
     <div class="section-title"><h2>Goals &amp; Defaults</h2></div>
     <div class="card">
-      <div class="row field">
+      <div class="row field" style="display:none">
         <div><label class="field-label">Daily water goal (ml)</label><input type="number" id="st-water" value="${s.waterGoalMl}" step="250"/></div>
         <div><label class="field-label">Sleep goal (hrs)</label><input type="number" id="st-sleep" value="${s.sleepGoalHrs}" step="0.5"/></div>
       </div>
@@ -3522,31 +4395,55 @@ function renderSettings(){
 
     <div class="section-title"><h2>Reminders</h2></div>
     <div class="card">
-      <div style="display:flex; gap:10px; align-items:flex-start; padding:12px 14px; margin-bottom:6px; background:var(--clay-soft); border:1px solid var(--clay); border-radius:12px;">
-        <span style="color:var(--clay); flex-shrink:0; margin-top:1px;">${icon("alert-triangle",16)}</span>
+      <div style="display:flex; gap:10px; align-items:flex-start; padding:12px 14px; margin-bottom:10px; background:var(--accent-soft); border-radius:12px;">
+        <span style="color:var(--accent); flex-shrink:0; margin-top:1px;">${icon("bell-ring",16)}</span>
         <div style="font-size:12.5px; line-height:1.55; color:var(--ink);">
-          <strong>Reminders arrive even when My Day Buddy is closed.</strong> Android's own alarm system delivers them, so they work with the app shut, in the background, or the phone locked, and they survive a restart. If nothing arrives, turn on <em>Alarms &amp; reminders</em> for My Day Buddy in Android's app settings. Android can still delay an alarm in deep sleep or on low battery, so for a dose you must not miss, keep a separate alarm in your phone's clock app.
+          <strong>Reminders arrive with the app closed.</strong> Android delivers them itself, so they work with My Day Buddy shut or your phone locked, and they survive a restart.
+          <a href="#" id="nt-help" style="color:var(--accent); font-weight:600; text-decoration:none; white-space:nowrap;">Not arriving?</a>
         </div>
       </div>
       <div class="linkline"><span>Task reminders</span><label class="switch"><input type="checkbox" id="nt-tasks" ${s.notifTasks?'checked':''}/><span class="slider"></span></label></div>
-      <div class="linkline"><span>Medicine reminders</span><label class="switch"><input type="checkbox" id="nt-meds" ${s.notifMeds?'checked':''}/><span class="slider"></span></label></div>
-      <div class="linkline"><span>Water reminders</span><label class="switch"><input type="checkbox" id="nt-water" ${s.notifWater?'checked':''}/><span class="slider"></span></label></div>
-      <div class="linkline"><span>Habit reminders</span><label class="switch"><input type="checkbox" id="nt-habits" ${s.notifHabits?'checked':''}/><span class="slider"></span></label></div>
-      <div class="linkline"><span>Enable browser notifications</span><button class="btn btn-soft" id="nt-enable" style="padding:6px 12px; font-size:12.5px;">${("Notification" in window && Notification.permission==="granted")?"Enabled ✓":"Enable"}</button></div>
+      <div class="linkline" style="display:none"><span>Daily reminders</span><label class="switch"><input type="checkbox" id="nt-meds" ${s.notifMeds?'checked':''}/><span class="slider"></span></label></div>
+      <div class="linkline" style="display:none"><span>Water reminders<span class="ll-sub">${waterReminderTimes().join(", ")||"no times set"} &middot; skipped once you reach your goal</span></span><label class="switch"><input type="checkbox" id="nt-water" ${s.notifWater?'checked':''}/><span class="slider"></span></label></div>
+      <div class="linkline"><span>Habit reminders<span class="ll-sub">${habitsWithReminders().length? habitsWithReminders().length+" habit"+(habitsWithReminders().length===1?"":"s")+" with a time set" : "set a time on a habit to use these"}</span></span><label class="switch"><input type="checkbox" id="nt-habits" ${s.notifHabits?'checked':''}/><span class="slider"></span></label></div>
+      <div class="linkline"><span>${Native.on?"Allow notifications":"Enable browser notifications"}</span><button class="btn btn-soft" id="nt-enable" style="padding:6px 12px; font-size:12.5px;">${("Notification" in window && Notification.permission==="granted")?"Enabled ✓":"Enable"}</button></div>
       <div class="linkline"><span>Notification sound</span><label class="switch"><input type="checkbox" id="nt-sound" ${s.notifSound?'checked':''}/><span class="slider"></span></label></div>
+
       <div class="field" style="margin-top:12px;">
         <label class="field-label">Sound</label>
         <select id="nt-soundchoice">
-          <option value="chime" ${s.soundChoice==='chime'?'selected':''}>Chime</option>
-          <option value="ping" ${s.soundChoice==='ping'?'selected':''}>Ping</option>
-          <option value="bell" ${s.soundChoice==='bell'?'selected':''}>Bell</option>
+          ${Object.keys(SOUND_PRESETS).map(k=>`<option value="${k}" ${s.soundChoice===k?'selected':''}>${SOUND_PRESETS[k].label}</option>`).join("")}
         </select>
       </div>
       <div class="row" style="margin-top:10px;">
         <button class="btn btn-ghost" id="nt-testsound">${icon("volume-2",15)} Test Sound</button>
         <button class="btn btn-ghost" id="nt-testnotif">${icon("bell-ring",15)} Test Notification</button>
       </div>
-      <p class="muted" style="font-size:11.5px; margin-top:10px;">Browser notifications need permission and are not available on every device. Where they are not, My Day Buddy shows an in-app message instead. Either way, the app has to be open.</p>
+      <p class="muted" style="font-size:11.5px; line-height:1.55; margin-top:12px;">${Native.on
+        ? "Notifications need permission the first time you switch a reminder on. The sound plays only while the app is open; a reminder that arrives with it closed uses your phone's own notification sound."
+        : "Browser notifications need permission and are not available on every device. Where they are not, My Day Buddy shows an in-app message instead. On the web a reminder can only appear while this page is open &mdash; the installed Android app is the one that delivers them with the app closed."}</p>
+      <p class="muted" style="font-size:11.5px; line-height:1.55; margin:14px 0 0; padding-left:10px; border-left:2px solid var(--clay);">
+        Android can delay an alarm in deep sleep or on low battery. For a dose you must not miss, keep a separate alarm in your phone's clock app.
+      </p>
+    </div>
+
+    <div class="section-title"><h2>Daily check-in</h2></div>
+    <div class="card">
+      <div class="linkline">
+        <span style="font-weight:600; font-size:13.5px;">Ask me morning and evening
+          <span class="ll-sub" style="font-weight:400;">A plan when you open it in the morning, a review at night. Opens once each, then leaves you alone.</span>
+        </span>
+        <label class="switch"><input type="checkbox" id="ci-enabled" ${s.checkinEnabled?'checked':''}/><span class="slider"></span></label>
+      </div>
+      ${s.checkinEnabled?`
+      <div class="row field" style="margin-top:14px;">
+        <div><label class="field-label">Morning from</label>
+          <select id="ci-mhour">${[5,6,7,8,9,10].map(h=>`<option value="${h}" ${s.checkinMorningHour===h?'selected':''}>${fmtTime12(String(h).padStart(2,"0")+":00")}</option>`).join("")}</select></div>
+        <div><label class="field-label">Evening from</label>
+          <select id="ci-ehour">${[17,18,19,20,21,22].map(h=>`<option value="${h}" ${s.checkinEveningHour===h?'selected':''}>${fmtTime12(String(h).padStart(2,"0")+":00")}</option>`).join("")}</select></div>
+      </div>
+      <button class="btn btn-ghost" id="ci-open-now" style="width:100%; margin-top:6px;">${icon("sunrise",14)} Open today's check-in</button>
+      `:""}
     </div>
 
     <div class="section-title"><h2>Quotes</h2></div>
@@ -3620,7 +4517,7 @@ function renderSettings(){
       <button class="linkline" data-legal="privacy" style="width:100%;background:none;border:none;cursor:pointer;color:var(--ink);text-align:left;">
         <span style="display:flex;align-items:center;gap:10px;font-weight:600;font-size:13.5px;">${icon("shield",16)} Privacy Policy</span>${icon("chevron-right",16)}
       </button>
-      <button class="linkline" data-legal="health" style="width:100%;background:none;border:none;cursor:pointer;color:var(--ink);text-align:left;">
+      <button class="linkline" data-legal="health" style="display:none;width:100%;background:none;border:none;cursor:pointer;color:var(--ink);text-align:left;">
         <span style="display:flex;align-items:center;gap:10px;font-weight:600;font-size:13.5px;">${icon("stethoscope",16)} Health &amp; Medical Disclaimer</span>${icon("chevron-right",16)}
       </button>
       <div class="linkline"><span style="font-size:13.5px;">Version</span><span class="mono muted" style="font-size:12.5px;">${APP_VERSION}</span></div>
@@ -3635,6 +4532,22 @@ function renderSettings(){
     if(u.gender==="female" && !s.cycleTrackingEnabled && !s.cycleChoiceMade){ s.cycleTrackingEnabled = true; }
     save(); renderSettings(); renderShell();
   });
+  document.getElementById("ci-enabled").onchange = e=>{ s.checkinEnabled = e.target.checked; save(); renderSettings(); };
+  const ciM = document.getElementById("ci-mhour");
+  if(ciM) ciM.onchange = e=>{ s.checkinMorningHour = parseInt(e.target.value,10); save(); };
+  const ciE = document.getElementById("ci-ehour");
+  if(ciE) ciE.onchange = e=>{ s.checkinEveningHour = parseInt(e.target.value,10); save(); };
+  const ciNow = document.getElementById("ci-open-now");
+  if(ciNow) ciNow.onclick = ()=>{
+    const phase = checkinPhaseNow() || (new Date().getHours() >= 17 ? "evening" : "morning");
+    openCheckin(phase, checkinDateKey(phase));
+  };
+  document.getElementById("st-health-on").onchange = e=>{
+    s.healthEnabled = e.target.checked;
+    if(!s.healthEnabled && ui.route==="health") ui.route = "home";
+    save(); renderSettings(); renderShell();
+    if(!s.healthEnabled) toast("Health hidden. Those daily reminders stay off until you turn it back on.","heart-pulse");
+  };
   document.getElementById("st-cycle-on").onchange = e=>{
     s.cycleTrackingEnabled = e.target.checked; s.cycleChoiceMade = true;
     if(!s.cycleTrackingEnabled && ui.route==="cycle") ui.route = "home";
@@ -3654,6 +4567,14 @@ function renderSettings(){
   if(cycNotif) cycNotif.onchange = e=>{ s.notifCycle = e.target.checked; save(); if(e.target.checked) ensureNotifPermission(); };
   document.getElementById("st-open-dash").onclick = openDashboardCustomizeModal;
   root.querySelectorAll("[data-avatar]").forEach(b=> b.onclick = ()=>{ u.avatarEmoji=b.dataset.avatar; save(); renderSettings(); renderShell(); });
+  const avCustom = document.getElementById("st-avatar-custom");
+  if(avCustom){
+    bindSingleGraphemeInput(avCustom, g=>{ u.avatarEmoji = g; save(); renderShell(); });
+    avCustom.onblur = ()=>{
+      if(!avCustom.value) avCustom.value = u.avatarEmoji || "";
+      renderSettings();
+    };
+  }
   document.getElementById("st-dark").onchange = e=>{ u.darkMode=e.target.checked; applyTheme(); save(); renderShell(); };
   root.querySelectorAll("[data-accent]").forEach(b=> b.onclick = ()=>{ u.accent=b.dataset.accent; applyAccent(); save(); renderSettings(); });
   document.getElementById("st-save-goals").onclick = ()=>{
@@ -3701,10 +4622,27 @@ function renderSettings(){
   ["tasks","meds","water","habits","sound"].forEach(k=>{
     document.getElementById("nt-"+k).onchange = e=>{ s["notif"+k.charAt(0).toUpperCase()+k.slice(1)] = e.target.checked; save(); if(e.target.checked) ensureNotifPermission(); };
   });
-  document.getElementById("nt-soundchoice").onchange = e=>{ s.soundChoice=e.target.value; save(); };
+  document.getElementById("nt-soundchoice").onchange = e=>{ s.soundChoice=e.target.value; save(); playPreset(s.soundChoice); };
   document.getElementById("nt-testsound").onclick = ()=>playSound();
   document.getElementById("nt-testnotif").onclick = ()=> requestNotifPermissionThenTest();
   document.getElementById("nt-enable").onclick = ()=>{ requestNotifPermissionThenTest(); setTimeout(renderSettings, 400); };
+  /* Troubleshooting lives behind a link now. Most people never need it, and
+     showing it to everyone made a working feature read as a broken one. */
+  const ntHelp = document.getElementById("nt-help");
+  if(ntHelp) ntHelp.onclick = (e)=>{
+    e.preventDefault();
+    openModal(`
+      <div class="modal-head"><h3>If a reminder doesn't arrive</h3><button class="icon-btn-plain" onclick="__closeModal()">${icon("x",20)}</button></div>
+      <ol style="font-size:13.5px; line-height:1.6; padding-left:18px; margin:0 0 14px;">
+        <li style="margin-bottom:8px;">Open Android <strong>Settings &rarr; Apps &rarr; My Day Buddy</strong>.</li>
+        <li style="margin-bottom:8px;">Turn on <strong>Alarms &amp; reminders</strong>. Without it Android will not wake the app at an exact time.</li>
+        <li style="margin-bottom:8px;">Under <strong>Battery</strong>, set My Day Buddy to <strong>Unrestricted</strong>. Battery savers are the most common reason a reminder is late.</li>
+        <li>Check the reminder itself has a time set, and that the task or dose is not already ticked off for today.</li>
+      </ol>
+      <button class="btn btn-primary" style="width:100%;" onclick="__closeModal()">Got it</button>
+    `);
+    mountIcons();
+  };
   document.getElementById("st-quotepref").onchange = e=>{ s.quotePref=e.target.value; save(); };
   bindLegalLinks(root);
   const persistSlot = document.getElementById("st-persist-slot");
@@ -3746,7 +4684,10 @@ function renderSettings(){
 /* =========================================================
    STORAGE, PERMISSIONS & LEGAL
    ========================================================= */
-const APP_VERSION = "1.3.0";
+/* Keep this in step with versionName in android/app/build.gradle. They are
+   separate strings in separate files and nothing enforces it, which is how the
+   app came to show 1.3.0 while Play showed 1.2.1 for the same build. */
+const APP_VERSION = "2.0.2";
 const LEGAL_VERSION = "2026-09-01";
 const LEGAL_UPDATED = "1 September 2026";
 const CONTACT_EMAIL = "contact.gauravhq@gmail.com";
@@ -3826,7 +4767,7 @@ function shouldNudgeInstall(){
 
 /* ---------- permissions summary ---------- */
 const PERMISSIONS = [
-  {icon:"bell", name:"Notifications", why:"Used for the reminders you switch on: tasks, medicines, focus sessions and cycle dates. Asked for the first time you enable one. On Android these are handed to the system alarm scheduler, so they arrive even when My Day Buddy is closed."},
+  {icon:"bell", name:"Notifications", why:"Used for the reminders you switch on: tasks, habits, water, focus sessions, cycle dates and anything on your daily list. Asked for the first time you enable one. On Android these are handed to the system alarm scheduler, so they arrive even when My Day Buddy is closed."},
   {icon:"mic", name:"Microphone", why:"Only used while you are recording a voice note in the Journal. Recording stops the moment you tap stop, and the audio is saved on this device."},
   {icon:"hard-drive", name:"Persistent storage", why:"Asks your browser not to auto-delete My Day Buddy's data when the device is low on space. Strongly recommended, since your data lives only on this device."},
   {icon:"fingerprint", name:"Device unlock (Face ID / fingerprint)", why:"Optional, only if you lock your Journal. Your browser performs the check, and My Day Buddy never receives your biometric data."},
@@ -3843,7 +4784,7 @@ function legalDocHtml(id){
     return STAMP
     + P("Short version: My Day Buddy has no account system, no server and no analytics. Everything you type stays in your own browser. Nobody, including the developer, can read it.")
     + H("What My Day Buddy stores, and where")
-    + P("All of your entries (tasks, habits, goals, focus sessions, journal text, mood, health logs and cycle data) are written to <strong>localStorage</strong> in the browser you are using right now. Journal photos and voice notes are stored in <strong>IndexedDB</strong> on the same device. None of it is transmitted anywhere.")
+    + P("All of your entries (tasks, habits, goals, focus sessions, journal text and energy check-ins) are written to <strong>localStorage</strong> in the browser you are using right now. Journal photos and voice notes are stored in <strong>IndexedDB</strong> on the same device. None of it is transmitted anywhere.")
     + P("Because the data is tied to this one installation on this one device, it does not sync between your phone and your computer, and it is erased if you uninstall the app, clear its site data, or use a private window.")
     + H("What is never collected")
     + UL(["No account, email address, name or phone number is sent anywhere. The name you enter is only shown back to you.",
@@ -3852,17 +4793,12 @@ function legalDocHtml(id){
           "No selling or sharing of data with third parties, because no data reaches the developer in the first place."])
     + H("Third parties that see a network request")
     + P(Native.on
-      ? "The Android app carries its own copy of the app files, so it never contacts a web host to load itself. It does still fetch two things from the internet: the typefaces and the icon set. These parties can see your IP address and that a file was requested, but never your entries:"
-      : "My Day Buddy is a web page, so loading it involves ordinary web requests. These parties can see your IP address and that you requested a file, but never your entries:")
-    + UL(Native.on
-      ? ["<strong>Google Fonts</strong> (fonts.googleapis.com, fonts.gstatic.com), which supplies the typefaces.",
-         "<strong>unpkg</strong>, which supplies the icon library."]
-      : ["<strong>GitHub Pages</strong>, which hosts the app files.",
-         "<strong>Google Fonts</strong> (fonts.googleapis.com, fonts.gstatic.com), which supplies the typefaces.",
-         "<strong>unpkg / cdnjs</strong>, which supplies the icon library."])
-    + P("Apart from those, My Day Buddy makes no network requests at all. Nothing you write is ever sent anywhere, and everything you have already written stays readable with no connection.")
+      ? "The Android app carries its own copy of the app files, typefaces and icons. It makes no network requests at all."
+      : "My Day Buddy is a web page, so loading it involves ordinary web requests. The typefaces are served from this site rather than from Google. These parties can see your IP address and that you requested a file, but never your entries:")
+    + (Native.on ? "" : UL(["<strong>GitHub Pages</strong>, which hosts the app files, typefaces and icons."]))
+    + P((Native.on ? "" : "Apart from that, ") + "My Day Buddy makes no network requests at all. Nothing you write is ever sent anywhere, and everything you have already written stays readable with no connection.")
     + H("Sensitive categories")
-    + P("My Day Buddy lets you record health-related information, including mood, sleep, medicines and, if you turn it on, menstrual cycle data. This is treated exactly like every other entry: written to your device only, never uploaded, never analysed by anyone but you. Cycle tracking is off by default and can be switched off at any time in Settings.")
+    + P("Earlier versions of My Day Buddy could record health, water, medicine and menstrual cycle entries. Those trackers have been removed. Any entries you made before stay only on your device and in backups you export yourself. They are never uploaded.")
     + H("Your control over the data")
     + UL(["<strong>Export</strong>: Settings → Data → Export JSON gives you a complete copy of everything.",
           "<strong>Delete</strong>: Settings → Data → Reset All Data erases it permanently. Uninstalling the app, or clearing its site data in the browser, does the same.",
@@ -3889,7 +4825,7 @@ function legalDocHtml(id){
           "Do not use it for anything unlawful."])
     + H("No warranty")
     + P("My Day Buddy is provided “as is” and “as available”, without warranties of any kind, express or implied, including fitness for a particular purpose.")
-  + P("<strong>Reminders are scheduled through Android's alarm system.</strong> They arrive when the app is closed or your phone is locked, and they survive a restart. Delivery still depends on Android: a withheld Alarms &amp; reminders permission, battery optimisation, or deep sleep can delay or suppress one. Do not rely on My Day Buddy alone for anything that matters, medication timing above all. Keep a separate alarm for those.")
+  + P("<strong>Reminders are scheduled through Android's alarm system.</strong> They arrive when the app is closed or your phone is locked, and they survive a restart. Delivery still depends on Android: a withheld Alarms &amp; reminders permission, battery optimisation, or deep sleep can delay or suppress one. Never rely on My Day Buddy alone for anything time critical. Keep a separate alarm in your phone's clock app for those.")
     + H("Limitation of liability")
     + P("To the maximum extent permitted by law, the developer is not liable for any loss of data, missed reminder, or any indirect or consequential loss arising from your use of My Day Buddy.")
     + H("Open source")
@@ -3904,8 +4840,8 @@ function legalDocHtml(id){
   return STAMP
   + P("<strong>My Day Buddy is not a medical device and does not provide medical advice.</strong>")
   + H("General health tracking")
-  + P("Water, sleep, mood, workout and medicine entries are a personal diary. My Day Buddy does not diagnose anything and does not check your entries for safety.")
-  + P("<strong>Medicine reminders are scheduled through Android's alarm system and arrive with the app closed.</strong> They are still not a clinical alert system: Android can delay or suppress an alarm, and the Alarms &amp; reminders permission can be withheld or revoked. Never rely on a reminder from My Day Buddy for medication or treatment timing. Keep a real alarm for that.")
+  + P("Water, sleep, mood and workout entries are a personal diary. My Day Buddy does not diagnose anything, gives no advice of any kind, and does not check your entries for safety.")
+  + P("<strong>Daily reminders are scheduled through Android's alarm system and arrive with the app closed.</strong> They are still not an alert system to depend on: Android can delay or suppress an alarm, and the Alarms &amp; reminders permission can be withheld or revoked. For anything that genuinely matters if it is missed, set a real alarm as well.")
   + H("Menstrual cycle predictions")
   + P("Predicted period dates, fertile windows and ovulation days are simple arithmetic based on the averages of what you have logged. They are estimates only.")
   + UL(["<strong>Not contraception.</strong> Do not use the fertile window to plan or avoid pregnancy.",
@@ -3941,7 +4877,7 @@ function closeLegalModal(){
   setTimeout(()=>{ const r = document.getElementById("legal-root"); if(r) r.innerHTML = ""; }, 200);
 }
 function legalLinksHtml(){
-  return `<a href="#" data-legal="terms" style="color:var(--accent); font-weight:600;">Terms of Use</a>, the <a href="#" data-legal="privacy" style="color:var(--accent); font-weight:600;">Privacy Policy</a> and the <a href="#" data-legal="health" style="color:var(--accent); font-weight:600;">Health Disclaimer</a>`;
+  return `<a href="#" data-legal="terms" style="color:var(--accent); font-weight:600;">Terms of Use</a> and the <a href="#" data-legal="privacy" style="color:var(--accent); font-weight:600;">Privacy Policy</a>`;
 }
 function bindLegalLinks(root){
   (root||document).querySelectorAll("[data-legal]").forEach(a=> a.onclick = (e)=>{ e.preventDefault(); openLegalModal(a.dataset.legal); });
@@ -3958,13 +4894,13 @@ function openLegalConsentModal(){
   openModal(`
     <div class="modal-head"><h3>Before you continue</h3></div>
     <p class="muted" style="font-size:13.5px; line-height:1.6; margin-top:-8px;">
-      My Day Buddy now has published terms, a privacy policy and a health disclaimer. Nothing about how your data is handled has changed. It still never leaves this device. Please have a look and confirm.
+      My Day Buddy now has published terms and a privacy policy. Nothing about how your data is handled has changed. It still never leaves this device. Please have a look and confirm.
     </p>
     <div class="card" style="background:var(--bg-soft); box-shadow:none; padding:14px; margin-bottom:16px;">
       <div style="display:flex; gap:10px; align-items:flex-start;">
         <input type="checkbox" id="lc-agree" style="width:18px;height:18px;margin-top:2px;flex-shrink:0;"/>
         <label for="lc-agree" style="font-size:13px; line-height:1.55; cursor:pointer;">
-          I have read and agree to the ${legalLinksHtml()}. I understand my data is stored only on this device and that My Day Buddy does not provide medical advice.
+          I have read and agree to the ${legalLinksHtml()}. I understand my data is stored only on this device.
         </label>
       </div>
     </div>
@@ -3976,28 +4912,381 @@ function openLegalConsentModal(){
   btn.onclick = ()=>{ acceptLegal(); closeModal(); rerenderCurrent(); };
 }
 
+
+/* =========================================================
+   DAILY CHECK-IN  (morning plan / evening review)
+
+   Opens itself once each morning and once each evening, then never again that
+   day. Everything it writes is an ordinary task, journal entry or note, so
+   nothing here becomes a second place your data hides in.
+   ========================================================= */
+function checkinFor(dateKey){
+  state.checkins = state.checkins || {};
+  return state.checkins[dateKey] || null;
+}
+function saveCheckin(dateKey, phase, data){
+  state.checkins = state.checkins || {};
+  const rec = state.checkins[dateKey] || {};
+  rec[phase] = Object.assign({at: Date.now()}, data||{});
+  state.checkins[dateKey] = rec;
+  save();
+}
+function checkinPhaseNow(){
+  const h = new Date().getHours();
+  const m = state.settings.checkinMorningHour, e = state.settings.checkinEveningHour;
+  if(h >= m && h < 12) return "morning";
+  if(h >= e || h < 4) return "evening";   /* wraps past midnight */
+  return null;
+}
+/* The evening review belongs to the day you started, not the one the clock has
+   just rolled into, so a 1am check-in still reviews yesterday. */
+function checkinDateKey(phase){
+  const h = new Date().getHours();
+  if(phase === "evening" && h < 4) return addDays(todayKey(), -1);
+  return todayKey();
+}
+function maybeOpenCheckin(){
+  if(!state.settings.checkinEnabled) return;
+  if(ui.checkinOpen) return;
+  if(!state.onboarded || !legalAccepted()) return;
+  /* Never take over a modal that is already open: returning to the app in the
+     middle of editing a task must not throw that away. */
+  if(document.querySelector("#modal-root .overlay") || document.querySelector("#legal-root .overlay")) return;
+  const phase = checkinPhaseNow();
+  if(!phase) return;
+  const dk = checkinDateKey(phase);
+  const rec = checkinFor(dk);
+  if(rec && rec[phase]) return;           /* already done today */
+  openCheckin(phase, dk);
+}
+
+/* ---------- what today actually holds ---------- */
+function checkinAgenda(dk){
+  const tasks = tasksForDate(dk).filter(t=>!taskDoneOn(t,dk))
+    .sort((a,b)=> (a.time||"99:99").localeCompare(b.time||"99:99"));
+  const sessions = (state.focusSessions||[]).filter(f=>f.date===dk && !f.completed)
+    .sort((a,b)=> (a.startTime||"99:99").localeCompare(b.startTime||"99:99"));
+  const meds = healthEnabled()
+    ? (state.medicines||[]).filter(m=>m.time && !(state.medicineLogs[dk]||{})[m.id])
+    : [];
+  const goals = (state.goals||[]).filter(g=>{
+    if(g.status==="done" || !g.deadline) return false;
+    const left = daysBetween(dk, g.deadline);
+    return left >= 0 && left <= 7;
+  }).sort((a,b)=> a.deadline.localeCompare(b.deadline));
+  const habits = (state.habits||[]).filter(h=>!habitDoneOn(h.id, dk));
+  return {tasks, sessions, meds, goals, habits};
+}
+function agendaHtml(a, dk){
+  const rows = [];
+  a.tasks.forEach(t=> rows.push({icon:"check-square", label:t.title, meta:t.time?fmtTime12(t.time):""}));
+  a.sessions.forEach(f=> rows.push({icon:"timer", label:f.label||sessionTypeMeta(f.type).label, meta:f.startTime?fmtTime12(f.startTime):""}));
+  a.meds.forEach(m=> rows.push({icon:"bell", label:m.name, meta:fmtTime12(m.time)}));
+  a.goals.forEach(g=>{
+    const left = daysBetween(dk, g.deadline);
+    rows.push({icon:"target", label:g.title, meta: left===0?"due today":"due in "+left+"d"});
+  });
+  if(!rows.length){
+    return `<p class="muted" style="font-size:13px; margin:0 0 4px;">Nothing scheduled. A clear day is a fine thing, or add something below.</p>`;
+  }
+  return `<div style="display:flex; flex-direction:column; gap:7px; margin-bottom:4px;">` + rows.map(r=>`
+    <div style="display:flex; align-items:center; gap:9px; font-size:13.5px;">
+      <span style="color:var(--ink-faint); flex-shrink:0; line-height:0;">${icon(r.icon,15)}</span>
+      <span style="flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${escapeHtml(r.label)}</span>
+      ${r.meta?`<span class="mono muted" style="font-size:11.5px; flex-shrink:0;">${escapeHtml(r.meta)}</span>`:""}
+    </div>`).join("") + `</div>`;
+}
+
+function openCheckin(phase, dk){
+  ui.checkinOpen = true;
+  if(phase === "morning") openMorningCheckin(dk); else openEveningCheckin(dk);
+}
+function closeCheckin(){ ui.checkinOpen = false; closeModal(); }
+
+/* ---------- morning ---------- */
+function openMorningCheckin(dk){
+  const a = checkinAgenda(dk);
+  const name = state.user.name || "there";
+  openModal(`
+    <div class="modal-head">
+      <h3>Good morning, ${escapeHtml(name)}</h3>
+      <button class="icon-btn-plain" id="ci-close">${icon("x",20)}</button>
+    </div>
+    <p class="muted" style="font-size:12.5px; margin:-8px 0 14px;">${fmtDateLong(dk)}</p>
+
+    <div class="card" style="background:var(--bg-soft); box-shadow:none; padding:14px; margin-bottom:16px;">
+      <div class="brief-label" style="margin-bottom:9px;">${icon("list",12)} On your plate</div>
+      ${agendaHtml(a, dk)}
+      ${a.habits.length?`<div class="muted" style="font-size:12px; margin-top:9px;">${a.habits.length} habit${a.habits.length===1?"":"s"} still to tick.</div>`:""}
+    </div>
+
+    <div class="field"><label class="field-label">What's the main thing today?</label>
+      <input type="text" id="ci-intention" placeholder="e.g. Finish the deck" maxlength="120"/></div>
+
+    <div class="field"><label class="field-label">Anything you want reminded of?</label>
+      <div class="row">
+        <input type="text" id="ci-remind" placeholder="e.g. Call the bank" maxlength="120" style="flex:2;"/>
+        <input type="time" id="ci-remind-time" style="flex:1;"/>
+      </div>
+      <p class="muted" style="font-size:11.5px; margin:6px 0 0;">Becomes a task for today. Give it a time and it gets a reminder.</p>
+    </div>
+
+    <div class="field"><label class="field-label">Anything else to add to today?</label>
+      <input type="text" id="ci-add" placeholder="Type one and press Enter" maxlength="120"/>
+      <div id="ci-added" style="display:flex; flex-wrap:wrap; gap:6px; margin-top:8px;"></div>
+    </div>
+
+    <button class="btn btn-primary" id="ci-save" style="width:100%; margin-top:6px;">Start the day</button>
+    <button class="btn btn-ghost" id="ci-skip" style="width:100%; margin-top:8px;">Skip today</button>
+  `, {locked:true});
+
+  const pending = [];
+  const addedEl = document.getElementById("ci-added");
+  const renderPending = ()=>{
+    addedEl.innerHTML = pending.map((t,i)=>`<span class="tag" style="display:inline-flex; align-items:center; gap:5px;">${escapeHtml(t)}<button data-rm="${i}" style="background:none;border:none;color:inherit;cursor:pointer;padding:0;line-height:1;">&times;</button></span>`).join("");
+    addedEl.querySelectorAll("[data-rm]").forEach(b=> b.onclick = ()=>{ pending.splice(parseInt(b.dataset.rm,10),1); renderPending(); });
+  };
+  const addInput = document.getElementById("ci-add");
+  addInput.onkeydown = (e)=>{
+    if(e.key === "Enter"){
+      e.preventDefault();
+      const v = addInput.value.trim();
+      if(v){ pending.push(v); addInput.value=""; renderPending(); }
+    }
+  };
+
+  document.getElementById("ci-close").onclick = ()=>{ saveCheckin(dk,"morning",{skipped:true}); closeCheckin(); };
+  document.getElementById("ci-skip").onclick  = ()=>{ saveCheckin(dk,"morning",{skipped:true}); closeCheckin(); toast("Skipped. It'll ask again tomorrow."); };
+
+  document.getElementById("ci-save").onclick = ()=>{
+    const intention = document.getElementById("ci-intention").value.trim();
+    const remind = document.getElementById("ci-remind").value.trim();
+    const remindTime = document.getElementById("ci-remind-time").value;
+    const trailing = addInput.value.trim();
+    if(trailing) pending.push(trailing);
+
+    const made = [];
+    if(remind){
+      const t = {id:uid(), title:remind, description:"", date:dk, time:remindTime||"", priority:"med",
+                 category:"Personal", completed:false, reminder:!!remindTime};
+      state.tasks.push(t); made.push(t.id);
+      if(remindTime) ensureNotifPermission();
+    }
+    pending.forEach(title=>{
+      const t = {id:uid(), title, description:"", date:dk, time:"", priority:"low",
+                 category:"Personal", completed:false};
+      state.tasks.push(t); made.push(t.id);
+    });
+
+    saveCheckin(dk, "morning", {intention: intention, addedTaskIds: made});
+    save(); closeCheckin(); render();
+    toast(made.length ? made.length+" added to today" : "Have a good one", "sunrise");
+  };
+  mountIcons();
+  setTimeout(()=>{ const el=document.getElementById("ci-intention"); if(el) el.focus(); }, 250);
+}
+
+/* ---------- evening ---------- */
+function openEveningCheckin(dk){
+  const all = tasksForDate(dk);
+  const done = all.filter(t=>taskDoneOn(t,dk));
+  const left = all.filter(t=>!taskDoneOn(t,dk));
+  const rec = checkinFor(dk) || {};
+  const intention = (rec.morning && rec.morning.intention) || "";
+  const habitsDone = (state.habits||[]).filter(h=>habitDoneOn(h.id,dk)).length;
+  const focusMin = state.pomodoro.sessions[dk] || 0;
+  /* A repeating task cannot simply be moved: its date drives the repeat. */
+  const movable = left.filter(t=>!taskRepeats(t));
+
+  openModal(`
+    <div class="modal-head">
+      <h3>How today went</h3>
+      <button class="icon-btn-plain" id="ci-close">${icon("x",20)}</button>
+    </div>
+    <p class="muted" style="font-size:12.5px; margin:-8px 0 14px;">${fmtDateLong(dk)}</p>
+
+    ${intention?`
+    <div class="card" style="background:var(--accent-soft); box-shadow:none; padding:13px 14px; margin-bottom:14px;">
+      <div class="brief-label" style="margin-bottom:5px;">${icon("sunrise",12)} This morning you said</div>
+      <div style="font-size:14px; font-weight:600;">${escapeHtml(intention)}</div>
+      <div class="row" style="margin-top:10px;">
+        <button class="btn btn-soft" id="ci-int-yes" style="flex:1; padding:7px;">Did it</button>
+        <button class="btn btn-ghost" id="ci-int-no" style="flex:1; padding:7px;">Not today</button>
+      </div>
+      <input type="hidden" id="ci-int-result" value=""/>
+    </div>`:""}
+
+    <div class="card" style="background:var(--bg-soft); box-shadow:none; padding:14px; margin-bottom:14px;">
+      <div style="display:flex; gap:16px; flex-wrap:wrap; font-size:13px;">
+        <div><strong>${done.length}</strong> <span class="muted">of ${all.length} done</span></div>
+        ${habitsDone?`<div><strong>${habitsDone}</strong> <span class="muted">habit${habitsDone===1?"":"s"}</span></div>`:""}
+        ${focusMin?`<div><strong>${focusMin}m</strong> <span class="muted">focus</span></div>`:""}
+      </div>
+    </div>
+
+    ${left.length?`
+    <div class="field">
+      <label class="field-label">${left.length} still open &mdash; move any to tomorrow?</label>
+      <div style="display:flex; flex-direction:column; gap:2px;">
+        ${left.map(t=>`
+          <label class="linkline" style="padding:9px 2px; cursor:${taskRepeats(t)?'default':'pointer'};">
+            <span style="font-size:13.5px; ${taskRepeats(t)?'opacity:.6;':''}">${escapeHtml(t.title)}${taskRepeats(t)?' <span class="tag">repeats</span>':''}</span>
+            ${taskRepeats(t)?'':`<input type="checkbox" class="ci-move" data-id="${t.id}" checked style="width:18px;height:18px;"/>`}
+          </label>`).join("")}
+      </div>
+      ${movable.length?`<p class="muted" style="font-size:11.5px; margin:8px 0 0;">Unticked ones stay on ${fmtDateLong(dk)}.</p>`:""}
+    </div>`:`
+    <p style="font-size:13.5px; margin:0 0 14px;">${all.length ? "Everything on today's list is done. Rare and worth noticing." : "Nothing was on the list today."}</p>`}
+
+    <div class="field"><label class="field-label">Anything worth noting?</label>
+      <textarea id="ci-note" placeholder="A line about the day. Goes into your journal." style="min-height:80px;"></textarea></div>
+
+    <button class="btn btn-primary" id="ci-save" style="width:100%; margin-top:6px;">Close out the day</button>
+    <button class="btn btn-ghost" id="ci-skip" style="width:100%; margin-top:8px;">Skip</button>
+  `, {locked:true});
+
+  const intEl = document.getElementById("ci-int-result");
+  const yes = document.getElementById("ci-int-yes"), no = document.getElementById("ci-int-no");
+  if(yes && no){
+    const mark = (v)=>{
+      intEl.value = v;
+      yes.className = "btn " + (v==="yes"?"btn-primary":"btn-ghost");
+      no.className  = "btn " + (v==="no"?"btn-primary":"btn-ghost");
+      yes.style.flex = no.style.flex = "1"; yes.style.padding = no.style.padding = "7px";
+    };
+    yes.onclick = ()=>mark("yes"); no.onclick = ()=>mark("no");
+  }
+
+  document.getElementById("ci-close").onclick = ()=>{ saveCheckin(dk,"evening",{skipped:true}); closeCheckin(); };
+  document.getElementById("ci-skip").onclick  = ()=>{ saveCheckin(dk,"evening",{skipped:true}); closeCheckin(); };
+
+  document.getElementById("ci-save").onclick = ()=>{
+    const tomorrow = addDays(dk, 1);
+    const moved = [];
+    document.querySelectorAll(".ci-move").forEach(cb=>{
+      if(!cb.checked) return;
+      const t = state.tasks.find(x=>x.id===cb.dataset.id);
+      if(t){ t.date = tomorrow; moved.push(t.id); }
+    });
+    const note = (document.getElementById("ci-note").value||"").trim();
+    if(note){
+      const entry = state.journal.entries[dk] || {text:"", images:[], voiceNotes:[]};
+      entry.text = (entry.text ? entry.text.replace(/\s+$/,"") + "\n\n" : "") + note;
+      entry.updatedAt = Date.now();
+      state.journal.entries[dk] = entry;
+    }
+    saveCheckin(dk, "evening", {
+      note: note ? true : false,
+      intentionMet: intEl ? (intEl.value||null) : null,
+      movedTaskIds: moved,
+      doneCount: done.length, totalCount: all.length
+    });
+    save(); closeCheckin(); render();
+    toast(moved.length ? moved.length+" moved to tomorrow" : "Day closed out", "moon");
+  };
+  mountIcons();
+}
+
 /* ---------------- data export/import ---------------- */
-function exportData(){
-  const blob = new Blob([JSON.stringify(state,null,2)], {type:"application/json"});
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url; a.download = "daybuddy-export-"+todayKey()+".json";
-  document.body.appendChild(a); a.click(); a.remove();
-  URL.revokeObjectURL(url);
-  state.settings.lastExportAt = Date.now(); save();
-  toast("Backup saved to your downloads","download");
-  if(ui.route==="settings") renderSettings();
+/* Every media id the journal still points at. Photos and voice notes live in
+   IndexedDB rather than in state, which is why they used to be left out of the
+   backup entirely: the export looked complete and quietly wasn't. */
+function allReferencedMediaIds(st){
+  const ids = [];
+  const entries = (st.journal && st.journal.entries) || {};
+  Object.keys(entries).forEach(d=>{
+    const e = entries[d] || {};
+    (e.images||[]).forEach(id=>{ if(id) ids.push(id); });
+    (e.voiceNotes||[]).forEach(id=>{ if(id) ids.push(id); });
+  });
+  return Array.from(new Set(ids));
+}
+async function collectMediaForExport(){
+  const out = {};
+  const ids = allReferencedMediaIds(state);
+  for(const id of ids){
+    try{
+      const blob = await mediaGet(id);
+      if(!blob) continue;
+      const dataUrl = await blobToDataUrl(blob);
+      if(dataUrl) out[id] = dataUrl;
+    }catch(e){ /* one unreadable file must not sink the whole backup */ }
+  }
+  return out;
+}
+async function exportData(){
+  const btn = document.getElementById("data-export");
+  if(btn) btn.disabled = true;
+  try{
+    const mediaCount = allReferencedMediaIds(state).length;
+    if(mediaCount) toast("Packing "+mediaCount+" photo/voice file"+(mediaCount===1?"":"s")+"...","download");
+    const media = await collectMediaForExport();
+    const payload = Object.assign({}, state, {
+      _exportVersion: 2,
+      _exportedAt: new Date().toISOString(),
+      _media: media
+    });
+    const blob = new Blob([JSON.stringify(payload,null,2)], {type:"application/json"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "daybuddy-export-"+todayKey()+".json";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(()=>URL.revokeObjectURL(url), 30000);
+    state.settings.lastExportAt = Date.now(); save();
+    toast("Backup saved to your downloads ("+fmtBytes(blob.size)+")","download");
+    if(ui.route==="settings") renderSettings();
+  }catch(err){
+    toast("Couldn't build the backup. Try again, or free up some storage.");
+  }finally{
+    if(btn) btn.disabled = false;
+  }
+}
+async function restoreMediaFromExport(media){
+  if(!media || typeof media !== "object") return 0;
+  let restored = 0;
+  for(const id of Object.keys(media)){
+    const dataUrl = media[id];
+    if(typeof dataUrl !== "string" || dataUrl.indexOf("data:") !== 0) continue;
+    try{
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      await mediaPut(id, blob);
+      restored++;
+    }catch(e){ /* skip this one, keep the rest */ }
+  }
+  return restored;
 }
 function importData(e){
   const file = e.target.files[0]; if(!file) return;
   const reader = new FileReader();
   reader.onload = ()=>{
+    let parsed;
     try{
-      const parsed = JSON.parse(reader.result);
-      state = Object.assign(defaultState(), parsed);
-      save(); applyTheme(); render(); renderShell();
-      toast("Data imported","upload");
-    }catch(err){ toast("Import failed. The file is not valid"); }
+      parsed = safeParse(reader.result);
+    }catch(err){ toast("Import failed. The file is not valid JSON"); return; }
+    if(!looksLikeBackup(parsed)){ toast("That doesn't look like a My Day Buddy backup"); return; }
+    // Importing replaces everything. Ask first: it used to overwrite on the
+    // spot, with no way back.
+    confirmAction("Replace everything with this backup?",
+      "Your current tasks, habits, journal, photos and voice notes on this device will be replaced by the contents of this file. This cannot be undone.",
+      async ()=>{
+        const media = parsed._media;
+        delete parsed._media; delete parsed._exportVersion; delete parsed._exportedAt;
+        const def = defaultState();
+        state = Object.assign({}, def, parsed, {
+          user: Object.assign({}, def.user, parsed.user||{}),
+          settings: Object.assign({}, def.settings, parsed.settings||{}),
+          cycle: Object.assign({}, def.cycle, parsed.cycle||{}),
+        });
+        // a backup can't be used to hand someone a pre-unlocked journal
+        ui.journalUnlocked = false;
+        mediaUrlCache.forEach(url=>{ try{ URL.revokeObjectURL(url); }catch(e){} });
+        mediaUrlCache.clear();
+        save(); applyTheme(); render(); renderShell();
+        const restored = await restoreMediaFromExport(media);
+        rerenderCurrent();
+        toast(restored ? "Data imported, including "+restored+" media file"+(restored===1?"":"s") : "Data imported","upload");
+      });
   };
   reader.readAsText(file);
   e.target.value="";
@@ -4007,23 +5296,48 @@ function importData(e){
    NOTIFICATIONS / SOUND
    ========================================================= */
 let audioCtx=null;
-function playSound(){
-  if(!state.settings.notifSound) return;
+/* Tones are synthesised from oscillators every time they play. Nothing here is
+   a recording, so there is no sample to licence and nothing anyone owns: it is
+   arithmetic, the way a dial tone is. Each note is
+   {f: hz, t: seconds from the start, d: duration, g: peak gain,
+    type: waveform, to: hz to glide to}. */
+const SOUND_PRESETS = {
+  chime:   { label:"Chime",     notes:[{f:880},{f:1108.73,t:.12}] },
+  ping:    { label:"Ping",      notes:[{f:1200,d:.25}] },
+  bell:    { label:"Bell",      notes:[{f:660},{f:990,t:.12},{f:1320,t:.24}] },
+  soft:    { label:"Soft",      notes:[{f:523.25,d:.7,g:.11},{f:659.25,t:.14,d:.7,g:.09}] },
+  marimba: { label:"Marimba",   notes:[{f:587.33,type:"triangle",d:.22},{f:880,t:.1,type:"triangle",d:.28}] },
+  droplet: { label:"Droplet",   notes:[{f:1300,to:620,d:.32,g:.15}] },
+  chord:   { label:"Chord",     notes:[{f:523.25,d:.8,g:.09},{f:659.25,d:.8,g:.09},{f:783.99,d:.8,g:.09}] },
+  rise:    { label:"Rise",      notes:[{f:523.25,d:.16},{f:659.25,t:.09,d:.16},{f:783.99,t:.18,d:.3}] },
+  alert:   { label:"Alert",     notes:[{f:988,type:"square",d:.12,g:.09},{f:988,t:.18,type:"square",d:.12,g:.09}] },
+  night:   { label:"Night",     notes:[{f:392,d:.9,g:.1},{f:523.25,t:.22,d:.9,g:.08}] },
+};
+function soundPreset(id){ return SOUND_PRESETS[id] || SOUND_PRESETS.chime; }
+/* Plays a preset regardless of the notifSound switch - used by the previews in
+   Settings, where you have just asked to hear it. */
+function playPreset(id){
   try{
     audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
-    const freqMap = {chime:[880,1108], ping:[1200], bell:[660,990,1320]};
-    const freqs = freqMap[state.settings.soundChoice] || freqMap.chime;
-    freqs.forEach((f,i)=>{
-      const o = audioCtx.createOscillator(); const g = audioCtx.createGain();
-      o.type="sine"; o.frequency.value=f;
+    if(audioCtx.state === "suspended") audioCtx.resume();
+    const now = audioCtx.currentTime;
+    soundPreset(id).notes.forEach(n=>{
+      const o = audioCtx.createOscillator(), g = audioCtx.createGain();
+      o.type = n.type || "sine";
+      const t0 = now + (n.t || 0), dur = n.d || .35, peak = n.g || .18;
+      o.frequency.setValueAtTime(n.f, t0);
+      if(n.to) o.frequency.exponentialRampToValueAtTime(n.to, t0 + dur);
       o.connect(g); g.connect(audioCtx.destination);
-      const t0 = audioCtx.currentTime + i*0.12;
-      g.gain.setValueAtTime(0.0001,t0);
-      g.gain.exponentialRampToValueAtTime(0.18, t0+0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0+0.35);
-      o.start(t0); o.stop(t0+0.4);
+      g.gain.setValueAtTime(0.0001, t0);
+      g.gain.exponentialRampToValueAtTime(peak, t0 + .02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + dur);
+      o.start(t0); o.stop(t0 + dur + .05);
     });
   }catch(e){}
+}
+function playSound(){
+  if(!state.settings.notifSound) return;
+  playPreset(state.settings.soundChoice);
 }
 function requestNotifPermissionThenTest(){
   if(!("Notification" in window)){ toast("Notifications aren't supported here. Using in-app alerts instead."); playSound(); return; }
@@ -4066,11 +5380,12 @@ function render(){
   switch(ui.route){
     case "home": renderHome(); break;
     case "tasks": renderTasks(); break;
+    case "matrix": renderMatrix(); break;
     case "habits": renderHabits(); break;
     case "goals": renderGoals(); break;
     case "focus": renderFocus(); break;
     case "journal": renderJournal(); break;
-    case "health": renderHealth(); break;
+    case "health": if(!healthEnabled()){ ui.route="home"; render(); break; } renderHealth(); break;
     case "cycle": if(cycleEnabled()){ renderCycle(); } else { setRoute("home"); return; } break;
     case "calendar": renderCalendar(); break;
     case "insights": renderInsights(); break;
@@ -4092,23 +5407,26 @@ function openOnboardingModal(){
 
     <div class="field"><label class="field-label">Your name</label><input type="text" id="ob-name" placeholder="e.g. Alex" value="${escapeHtml(state.user.name||'')}"/></div>
     <div class="field"><label class="field-label">Pick an avatar</label>
-      <div style="display:flex; gap:8px; flex-wrap:wrap;">
-        ${["🌿","🌸","☀️","🌙","🔥","🐣","🌊","⭐","🍃","🦋"].map(e=>`<button class="btn-icon" data-ob-avatar="${e}" style="font-size:17px; ${state.user.avatarEmoji===e?'background:var(--accent-soft);border-color:var(--accent);':''}">${e}</button>`).join("")}
+      <div style="display:flex; gap:var(--s2); flex-wrap:wrap; align-items:center;">
+        ${["🌿","🌸","☀️","🌙","🔥","🐣","🌊","⭐","🍃","🦋"].map(e=>`<button class="btn-icon" data-ob-avatar="${e}" style="font-size:19px; ${state.user.avatarEmoji===e?'background:var(--accent-soft);border-color:var(--accent);':''}">${e}</button>`).join("")}
+        <input type="text" id="ob-avatar-custom" inputmode="text" autocomplete="off" aria-label="Any emoji or letter"
+               style="width:var(--tap); height:var(--tap); padding:0; text-align:center; font-size:19px; flex-shrink:0;"/>
       </div>
+      <p class="muted" style="font-size:var(--t-xs); margin:var(--s2) 0 0;">Or type your own with the emoji key on your keyboard.</p>
     </div>
-    <div class="field"><label class="field-label">Gender</label>
+    <div class="field" style="display:none"><label class="field-label">Gender</label>
       <div class="chip-row">
         ${GENDERS.map(g=>`<button class="chip" data-ob-gender="${g.id}">${g.label}</button>`).join("")}
       </div>
     </div>
-    <div class="field">
+    <div class="field" style="display:none">
       <div class="linkline" style="border-bottom:none; padding:8px 0;">
         <span style="display:flex; align-items:center; gap:8px; font-weight:600; font-size:13.5px;">${icon("droplet",16)} Track menstrual cycle</span>
         <label class="switch"><input type="checkbox" id="ob-cycle"/><span class="slider"></span></label>
       </div>
       <p class="muted" style="font-size:11.5px; margin:0;">Adds a Cycle tab for periods, flow, symptoms and predictions. Stays on this device, and you can switch it on or off anytime in Settings.</p>
     </div>
-    <div class="field"><label class="field-label">Daily water goal (ml)</label><input type="number" id="ob-water" value="${state.settings.waterGoalMl}" step="250"/></div>
+    <div class="field" style="display:none"><label class="field-label">Daily water goal (ml)</label><input type="number" id="ob-water" value="${state.settings.waterGoalMl}" step="250"/></div>
     <div class="field"><label class="field-label">Habits you want to track</label>
       <div style="display:flex; gap:8px; flex-wrap:wrap;">
         ${ONBOARD_HABIT_SUGGESTIONS.map(h=>`<button class="btn-icon" data-ob-habit="${escapeHtml(h.name)}" data-ob-icon="${h.icon}" style="width:auto;padding:0 12px;gap:6px;display:inline-flex;align-items:center;">${icon(h.icon,15)} ${h.name}</button>`).join("")}
@@ -4116,13 +5434,13 @@ function openOnboardingModal(){
     </div>
     <div class="field"><label class="field-label">A main goal (optional)</label><input type="text" id="ob-goal" placeholder="e.g. Prepare for finals, Ship the redesign"/></div>
     <div class="field"><label class="field-label">First task for today (optional)</label><input type="text" id="ob-task" placeholder="e.g. Plan the week"/></div>
-    <div class="field"><label class="field-label">A medicine/supplement to track (optional)</label><input type="text" id="ob-med" placeholder="e.g. Vitamin D"/></div>
+    <div class="field" style="display:none"><label class="field-label">Something to be reminded of each day (optional)</label><input type="text" id="ob-med" placeholder="e.g. Stretch, water the plants"/></div>
 
     <div class="card" style="background:var(--bg-soft); box-shadow:none; padding:14px; margin:18px 0 14px;">
       <div style="display:flex; gap:10px; align-items:flex-start;">
         <input type="checkbox" id="ob-agree" style="width:18px;height:18px;margin-top:2px;flex-shrink:0;"/>
         <label for="ob-agree" style="font-size:12.5px; line-height:1.55; cursor:pointer;">
-          I have read and agree to the ${legalLinksHtml()}. I understand that My Day Buddy stores everything on this device only, keeps no backup of its own, and does not provide medical advice.
+          I have read and agree to the ${legalLinksHtml()}. I understand that My Day Buddy stores everything on this device only and keeps no backup of its own.
         </label>
       </div>
     </div>
@@ -4134,10 +5452,16 @@ function openOnboardingModal(){
   `);
   let selectedAvatar = state.user.avatarEmoji || "🌿";
   let selectedHabits = [];
+  const obCustom = document.getElementById("ob-avatar-custom");
   document.querySelectorAll("[data-ob-avatar]").forEach(b=> b.onclick = ()=>{
     selectedAvatar = b.dataset.obAvatar;
-    document.querySelectorAll("[data-ob-avatar]").forEach(x=>x.style.cssText="font-size:17px;");
-    b.style.cssText = "font-size:17px;background:var(--accent-soft);border-color:var(--accent);";
+    document.querySelectorAll("[data-ob-avatar]").forEach(x=>x.style.cssText="font-size:19px;");
+    b.style.cssText = "font-size:19px;background:var(--accent-soft);border-color:var(--accent);";
+    if(obCustom) obCustom.value = "";
+  });
+  bindSingleGraphemeInput(obCustom, g=>{
+    selectedAvatar = g;
+    document.querySelectorAll("[data-ob-avatar]").forEach(x=>x.style.cssText="font-size:19px;");
   });
   bindLegalLinks(document.getElementById("modal-root"));
   const agreeBox = document.getElementById("ob-agree");
@@ -4167,7 +5491,7 @@ function openOnboardingModal(){
     if(name) state.user.name = name;
     state.user.avatarEmoji = selectedAvatar;
     state.user.gender = selectedGender;
-    state.settings.cycleTrackingEnabled = !!document.getElementById("ob-cycle").checked;
+    state.settings.cycleTrackingEnabled = false;
     state.settings.cycleChoiceMade = true;
     state.settings.waterGoalMl = parseInt(document.getElementById("ob-water").value,10) || state.settings.waterGoalMl;
     selectedHabits.forEach(name=>{
@@ -4179,10 +5503,37 @@ function openOnboardingModal(){
     const taskTitle = document.getElementById("ob-task").value.trim();
     if(taskTitle) state.tasks.push({id:uid(), title:taskTitle, description:"", date:todayKey(), time:"", priority:"med", category:"", completed:false, repeat:"none", completions:{}});
     const medName = document.getElementById("ob-med").value.trim();
-    if(medName) state.medicines.push({id:uid(), name:medName, dosage:"", time:""});
+    if(false && medName) state.medicines.push({id:uid(), name:medName, dosage:"", time:""});
     finish();
     toast("You're all set!","sparkles");
   };
+}
+/* v2: health, medicines, water and cycle tracking were removed. Anyone who
+   had entries there is told once, and offered a backup. Nothing is deleted:
+   the entries stay in storage and in every export. */
+function usedRemovedTrackers(){
+  try{
+    return Object.keys((state.health&&state.health.sleepLogs)||{}).length>0
+      || (state.workouts||[]).length>0
+      || (state.medicines||[]).length>0
+      || Object.values((state.water&&state.water.logs)||{}).some(v=>v>0 && v!==500)
+      || ((state.cycle&&state.cycle.periods)||[]).length>0;
+  }catch(e){ return false; }
+}
+function maybeShowV2RemovalNotice(){
+  if(state.settings.v2RemovalNoticeSeen) return;
+  state.settings.v2RemovalNoticeSeen = true; save();
+  if(!usedRemovedTrackers()) return;
+  openModal(`
+    <div class="modal-head"><h3>My Day Buddy is now about your day</h3></div>
+    <p style="font-size:14px; line-height:1.6; margin-top:-4px;">Health, medicine, water and cycle tracking have been removed so the app can focus on planning, focus and habits.</p>
+    <p class="muted" style="font-size:13px; line-height:1.6;">Your old entries are <strong>not deleted</strong>. They stay on this device and are included when you export a backup.</p>
+    <div class="row" style="margin-top:16px;">
+      <button class="btn btn-ghost" id="v2n-close">Got it</button>
+      <button class="btn btn-primary" id="v2n-export">${icon("download",15)} Export backup</button>
+    </div>`);
+  document.getElementById("v2n-close").onclick = closeModal;
+  document.getElementById("v2n-export").onclick = ()=>{ closeModal(); exportData(); };
 }
 function init(){
   applyTheme();
@@ -4190,16 +5541,26 @@ function init(){
   if(!state.settings.firstRunAt){ state.settings.firstRunAt = Date.now(); save(); }
   if(!state.onboarded){ setTimeout(openOnboardingModal, 350); }
   else if(!legalAccepted()){ setTimeout(openLegalConsentModal, 350); }
+  else { setTimeout(maybeShowV2RemovalNotice, 900); }
   checkStoragePersisted();
   // Sync pomodoro remaining with settings on first load
   ui.pomodoro.remaining = state.settings.pomodoroFocusMin*60;
+  restorePomodoroTimer();
   // register service worker gracefully
   if("serviceWorker" in navigator){
     navigator.serviceWorker.register("sw.js").catch(()=>{ /* ignore if unavailable in this environment */ });
   }
   startReminderEngine();
   checkDeviceUnlockSupport();
-  migrateBase64MediaToIndexedDB();
+  setTimeout(maybeOpenCheckin, 700);
+  /* Coming back to the app hours later should count as opening it. */
+  document.addEventListener("visibilitychange", ()=>{
+    if(!document.hidden) setTimeout(maybeOpenCheckin, 400);
+  });
+  migrateBase64MediaToIndexedDB().then(()=>{
+    /* after the migration, so freshly created ids are never treated as orphans */
+    setTimeout(sweepOrphanedMedia, 4000);
+  });
 }
 
 /* ================= NATIVE LOCAL NOTIFICATIONS (Capacitor) =================
@@ -4242,6 +5603,15 @@ function collectNativeReminders(days){
     out.push(o);
   };
 
+  /* A running timer, so the end-of-session chime arrives with the app closed. */
+  const pt = state.pomodoro && state.pomodoro.timer;
+  if(pt && pt.endsAt){
+    push("pomo-"+pt.endsAt,
+         pt.mode === "focus" ? "Focus session complete" : "Break's over",
+         pt.mode === "focus" ? "Nice work. Time for a break." : "Ready for another focus session?",
+         new Date(pt.endsAt));
+  }
+
   for(let dOff=0; dOff<days; dOff++){
     const dk = addDays(todayKey(), dOff);
 
@@ -4256,11 +5626,21 @@ function collectNativeReminders(days){
              (f.label||sessionTypeMeta(f.type).label)+" is scheduled now", atLocal(dk, f.startTime));
       });
     }
-    if(s.notifMeds){
+    if(s.notifMeds && healthEnabled()){
       const taken = state.medicineLogs[dk] || {};
       state.medicines.filter(m=>m.time && !taken[m.id]).forEach(m=>{
-        push("med-"+m.id+"-"+dk, "Medicine reminder",
-             m.name + (m.dosage ? ", "+m.dosage : ""), atLocal(dk, m.time));
+        push("med-"+m.id+"-"+dk, "Reminder", m.name, atLocal(dk, m.time));
+      });
+    }
+    if(false && s.notifWater && dOff < 3 && !waterGoalMetOn(dk)){
+      waterReminderTimes().forEach(hhmm=>{
+        push("water-"+hhmm+"-"+dk, "Water reminder",
+             "Time for a glass of water.", atLocal(dk, hhmm));
+      });
+    }
+    if(s.notifHabits && dOff < 7){
+      habitsWithReminders().filter(h=>!habitDoneOn(h.id, dk)).forEach(h=>{
+        push("habit-"+h.id+"-"+dk, "Habit reminder", h.name, atLocal(dk, h.time));
       });
     }
   }
@@ -4283,7 +5663,12 @@ function collectNativeReminders(days){
       }
     }
   }
-  return out.slice(0, 60); /* keep well under Android's pending-alarm ceiling */
+  /* Sorted by time, not by the order they were built: the previous version kept
+     the first 60 it happened to make, which quietly dropped cycle reminders (added
+     last) as soon as anything else filled the list. Stays well under Android's
+     pending-alarm ceiling. */
+  out.sort((a,b)=> a.schedule.at - b.schedule.at);
+  return out.slice(0, 100);
 }
 
 async function openExactAlarmSettings(){
@@ -4309,7 +5694,7 @@ async function syncNativeNotifications(){
       }
       try{
         await Native.LN.createChannel({ id:"daybook-reminders", name:"Reminders",
-          description:"Task, medicine, focus and cycle reminders", importance:4, visibility:1 });
+          description:"Task, habit, water, focus, cycle and daily reminders", importance:4, visibility:1 });
       }catch(e){}
       const pending = await Native.LN.getPending();
       if(pending && pending.notifications && pending.notifications.length){
@@ -4350,6 +5735,16 @@ function startReminderEngine(){
   checkReminders();
   setInterval(checkReminders, 15000);
 }
+/* A reminder is worth showing for half an hour after its time. Later than that
+   it is history, so it is marked as handled and stays quiet rather than
+   arriving in a heap the moment you open the app in the evening. */
+const REMINDER_GRACE_MIN = 30;
+function reminderDue(key, nowHM, atHM){
+  if(firedReminders.has(key)) return false;
+  if(nowHM < atHM) return false;
+  firedReminders.add(key);
+  return (timeToMinutes(nowHM) - timeToMinutes(atHM)) <= REMINDER_GRACE_MIN;
+}
 function checkReminders(){
   const now = new Date();
   const hhmm = String(now.getHours()).padStart(2,"0")+":"+String(now.getMinutes()).padStart(2,"0");
@@ -4357,20 +5752,27 @@ function checkReminders(){
   if(state.settings.notifTasks){
     state.tasks.filter(t=>t.reminder && t.time && taskOccursOn(t,today) && !taskDoneOn(t,today)).forEach(t=>{
       const key = "task-"+t.id+"-"+today;
-      if(!firedReminders.has(key) && hhmm>=t.time){
-        firedReminders.add(key);
-        notify("Task reminder", t.title);
-      }
+      if(reminderDue(key, hhmm, t.time)) notify("Task reminder", t.title);
     });
   }
-  if(state.settings.notifMeds){
+  if(state.settings.notifMeds && healthEnabled()){
     const medLog = state.medicineLogs[today]||{};
     state.medicines.filter(m=>m.time && !medLog[m.id]).forEach(m=>{
       const key = "med-"+m.id+"-"+today;
-      if(!firedReminders.has(key) && hhmm>=m.time){
-        firedReminders.add(key);
-        notify("Medicine reminder", m.name+(m.dosage?", "+m.dosage:""));
-      }
+      if(reminderDue(key, hhmm, m.time)) notify("Reminder", m.name);
+    });
+  }
+  if(false && state.settings.notifWater && !waterGoalMetOn(today)){
+    waterReminderTimes().forEach(t=>{
+      const key = "water-"+t+"-"+today;
+      if(reminderDue(key, hhmm, t)) notify("Water reminder", "Time for a glass of water.");
+    });
+  }
+  if(state.settings.notifHabits){
+    habitsWithReminders().forEach(h=>{
+      if(habitDoneOn(h.id, today)) return;
+      const key = "habit-"+h.id+"-"+today;
+      if(reminderDue(key, hhmm, h.time)) notify("Habit reminder", h.name);
     });
   }
   if(cycleEnabled() && state.settings.notifCycle && hhmm>="09:00"){
@@ -4395,10 +5797,7 @@ function checkReminders(){
   if(state.settings.notifFocusSessions !== false){
     state.focusSessions.filter(s=>!s.completed && s.date===today && s.startTime).forEach(s=>{
       const key = "session-"+s.id+"-"+today;
-      if(!firedReminders.has(key) && hhmm>=s.startTime){
-        firedReminders.add(key);
-        notify("Session reminder", (s.label||sessionTypeMeta(s.type).label)+" is scheduled now");
-      }
+      if(reminderDue(key, hhmm, s.startTime)) notify("Session reminder", (s.label||sessionTypeMeta(s.type).label)+" is scheduled now");
     });
   }
 }

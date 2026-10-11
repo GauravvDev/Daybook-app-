@@ -1,50 +1,54 @@
 # My Day Buddy
 
-Honestly, I built this for myself. I kept trying to track my routine tasks, habits, water, whatever and kept bouncing off apps that felt like spreadsheets wearing a productivity costume. So I made something calmer. Something I'd actually open every day instead of abandoning after a week.
+**A calm planner built on the Eisenhower Matrix. Private, offline and free.**
 
-Turns out it grew into a full daily companion. Track your day, understand yourself a bit better, build some discipline, that's really the whole idea.
+<p>
+  <img src="screenshots/1-today.png" width="24%" alt="Today: one thing first">
+  <img src="screenshots/2-matrix.png" width="24%" alt="Sort what matters with the Eisenhower Matrix">
+  <img src="screenshots/3-capture.png" width="24%" alt="Capture any thought">
+  <img src="screenshots/8-dark.png" width="24%" alt="Dark mode">
+</p>
 
-## Try it
+[Get it on Google Play](https://play.google.com/store/apps/details?id=io.github.gauravvdev.daybook) · [Try the web version](https://gauravvdev.github.io/Daybook-app-/)
 
-👉 **[Open My Day Buddy](https://gauravvdev.github.io/Daybook-app-/)**
+---
 
-## What's actually in here
+I built My Day Buddy because every planner I tried gave me a longer list, not a clearer head. Version 2 is a rebuild around one idea: **do the thing that matters first.**
 
-**Tasks & Habits :** The basics, done well priorities, categories, and streaks that make you not want to break the chain.
+## What it does
 
-**Goals  :** For the bigger stuff. A project at work, an exam you're prepping for. Break it into topics, check them off, watch the progress bar move instead of just hoping you're on track.
+- **One thing first.** Each day opens on your most important task, with a single button to start focusing on it.
+- **The Eisenhower Matrix, built in.** Every task gets one tap: Do now, Plan it, Quick task or Let it go. Tasks without a box are placed automatically from their priority and due date.
+- **Capture in a second.** The + button drops any thought into an inbox, so it is out of your head. Sort it later.
+- **Deep focus.** Pomodoro sessions and bookable focus blocks.
+- **Habits that last.** A seven-day view of every habit, with forgiving "comeback" days instead of broken streaks.
+- **A private journal.** Photos and voice notes, PIN or fingerprint lock, and export to a book-style file.
+- **An honest weekly report.** What you finished, where your focus went, how your energy changed.
 
-**Focus :** A Pomodoro timer, but you can also book actual time slots ahead of time, such as "Study 4 to 6pm", so your day has some shape to it.
+## Designed with psychology, not decoration
 
-**Journal :** This one's just for you. Write whatever, attach a photo or a voice note if text doesn't cut it that day. Lock it with a PIN or your face/fingerprint if it's on a shared device.
+The look is called **Calm Focus**. Every colour has exactly one job: blue for focus and planning, vermilion only for what is urgent, green for done, amber for "come back to it". Red is never used for failure. Each screen has one primary action, and sorting a task has exactly four choices.
 
-When you want it out of the app, **Export book** turns any stretch of your journal into a single self-contained HTML file, with writing, photos and playable voice notes all baked in, laid out like a printed book. Send it to someone, keep it as a backup, or hit print inside it for a PDF.
+## Private by design
 
-**Health :** Water, sleep, mood, workouts, meds. The stuff that's easy to forget to log but matters most.
+- No account, no server, no analytics, no ads.
+- Everything is stored on your own device. The Android app makes **no network requests at all**: fonts and icons ship inside it.
+- One-tap JSON export for backups, and one tap to delete everything.
+- [Privacy policy](https://gauravvdev.github.io/Daybook-app-/privacy.html)
 
-**Cycle :** Optional, and off unless you turn it on. Period logging with flow and symptoms, mood and PMS notes, a colour-coded calendar, and next-period / fertile-window estimates that learn from your own averages. Same rule as everything else here: it stays on your device.
+## How it is built
 
-**Insights :** A weekly report that actually tells you something, not just a wall of numbers.
+A single-file HTML, CSS and JavaScript app with no framework and no build step, wrapped for Android with Capacitor. Reminders use Android's own alarm scheduler, so they arrive with the app closed.
 
-**Make it yours :**  Rearrange the dashboard, pick your accent color, switch to dark mode at 11pm like the rest of us.
-
-## The part I actually care about
-
-There's no sign-up. No ads. Nothing gets sent anywhere it all just lives on your device, and it installs like a real app on your phone. I wanted something private, not another service quietly collecting my mood logs.
-
-**Your data, plainly :** No sign-up, no server, no analytics, no ads. Everything is written to your browser's own storage on your own device, which also means it doesn't sync between devices, and clearing your browsing data clears it. There's a one-tap JSON export for backups, and the app asks your browser to protect its storage from automatic cleanup. Terms of Use, Privacy Policy and a Health Disclaimer live in Settings → About & Legal.
-
-## Run it yourself
-
-No build step, no dependencies. It's just HTML, CSS, and JS being honest about what it is.
-
-```bash
+```
 git clone https://github.com/GauravvDev/Daybook-app-.git
 cd Daybook-app-
 python3 -m http.server 8000
 # open http://localhost:8000
 ```
 
-## License
+The Android build files live in `android-build/`. The signing keystore is not in this repo and never will be.
 
-[MIT](LICENSE). Take it, break it, make it better than I did.
+## Licence
+
+MIT. Icons from [Lucide](https://lucide.dev) (ISC).

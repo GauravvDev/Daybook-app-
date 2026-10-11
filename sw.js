@@ -9,9 +9,9 @@
  *     cache immediately and refreshed in the background. Those rarely change
  *     and speed matters more than freshness.
  */
-const CACHE_NAME = "daybuddy-cache-v10";
+const CACHE_NAME = "daybuddy-cache-v11";
 const SHELL = ["./", "./index.html", "./manifest.json", "./icon.svg",
-               "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png"];
+               "./icons.js", "./fonts/fonts.css", "./apple-touch-icon.png", "./icon-192.png", "./icon-512.png", "./icon-maskable-512.png"];
 const NETWORK_TIMEOUT_MS = 3500;
 
 self.addEventListener("install", (event) => {
